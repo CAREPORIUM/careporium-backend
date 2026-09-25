@@ -204,7 +204,7 @@ mongoose.connect("mongodb+srv://username:password@...");
 
 Instead use this as your connection string in your locally created .env file:
 
-MONGODB_URI=mongodb+srv://<your username>:<your password>@cluster0.erzqlbf.mongodb.net/careporium_db?appName=Cluster0;
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.erzqlbf.mongodb.net/careporium_db?appName=Cluster0;
 
 
 ---
