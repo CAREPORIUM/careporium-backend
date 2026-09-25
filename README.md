@@ -284,7 +284,7 @@ The health endpoint can be used to quickly confirm that the backend server is ru
 
 ---
 
-# 🔐 Environment Variables
+# Environment Variables
 
 The application currently expects:
 
@@ -307,7 +307,7 @@ ensure to check this before pushing your code to the repository.
 
 ---
 
-# 🌿 Git Workflow
+# Git Workflow
 
 To avoid everyone making changes directly to `main`, developers should work on feature branches.
 
@@ -360,7 +360,7 @@ Do not merge unreviewed work directly into `main`.
 
 ---
 
-# 🧪 API Testing
+# API Testing
 
 We will use **Postman** to test our API endpoints.
 
@@ -379,7 +379,7 @@ A shared Postman collection will be maintained as the API grows.
 
 ---
 
-# 🏗️ Development Principles
+# Development Principles
 
 ### 1. Keep responsibilities separated
 
@@ -439,9 +439,9 @@ Don't wait until the end of the sprint to discover that two modules were designe
 
 ---
 
-# 👥 Backend Team
+# Backend Team
 
-We currntly consist of 7 developers.
+We currently consist of 7 developers.
 
 Development will be collaborative. Module ownership means responsibility for coordinating and maintaining that area; it does not mean developers work in isolation.
 
@@ -461,7 +461,7 @@ Ownership may change as the requirements and MVP are finalized.
 
 ---
 
-# 📌 Current Development Roadmap
+# Current Development Roadmap
 
 ### Phase 1 — Backend Foundation - DONE
 
@@ -521,7 +521,7 @@ Ownership may change as the requirements and MVP are finalized.
 
 ---
 
-# 🚧 Important
+# Important
 
 This project is still under development.
 
@@ -538,7 +538,7 @@ This helps prevent different developers from implementing different interpretati
 
 ---
 
-# 📞 Team Communication
+# Team Communication
 
 When blocked, communicate early.
 
