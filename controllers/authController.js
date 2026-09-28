@@ -1,4 +1,4 @@
-import { registerWorker, loginWorker } from '../services/workerService.js';
+import { registerWorker, loginWorker } from '../services/authservice.js';
 
 const registerWorkerController = async (req, res) => {
     try{

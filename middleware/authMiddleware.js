@@ -24,7 +24,7 @@ const authMiddleware = (req, res, next) => {
             token,
             process.env.JWT_SECRET
         );
-        
+
         req.user = decoded;
 
         next();
@@ -37,4 +37,4 @@ const authMiddleware = (req, res, next) => {
     }
 };
 
-export default authMiddleware;
+export { authMiddleware };

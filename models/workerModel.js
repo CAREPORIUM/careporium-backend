@@ -12,7 +12,7 @@ const workerSchema = new mongoose.Schema(
             city: { type: String },
             state: { type: String },
         },
-        certificates: { type: String, default: '' }
+        certifications: { type: String, default: '' }
     }, { timestamps: true }
 )
 

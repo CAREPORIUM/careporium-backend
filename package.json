@@ -13,6 +13,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.11.0",
     "cors": "^2.8.6",
@@ -27,6 +28,8 @@
     "nodemon": "^3.1.14"
   },
   "allowScripts": {
-    "nodemailer@10.0.12": true
+    "nodemailer@10.0.12": true,
+    "fsevents@2.3.3": true,
+    "bcrypt@6.0.0": true
   }
 }

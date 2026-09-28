@@ -1,7 +1,6 @@
-import bcrypt from bycrypt;
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-
-import User from '../models/User.js';
+import User from '../models/userModel.js';
 import Worker from '../models/workerModel.js';
 import Facility from '../models/facilityModel.js';
 
