@@ -2,6 +2,7 @@ import express from "express";
 import 'dotenv/config';
 import cors from "cors";
 import connectDB from "./config/db.js";
+import authRoutes from "./routes/authRoutes.js";
 
 connectDB();
 
@@ -24,6 +25,8 @@ app.get("/health", (req, res) =>{
         message: "Server is up and running!"
     });
 });
+
+app.use("/api/auth/v1", authRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
