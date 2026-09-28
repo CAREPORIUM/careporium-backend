@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.post('/register/worker', registerWorkerController);
 router.post('/login', loginWorkerController);
-router.get('/getprofile', authMiddleware, getProfile);
-router.put('/updateprofile', authMiddleware, updateProfile);
+router.get('/get-profile', authMiddleware, getProfile);
+router.put('/update-profile', authMiddleware, updateProfile);
 
 export default router;

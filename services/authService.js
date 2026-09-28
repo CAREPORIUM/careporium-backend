@@ -5,7 +5,7 @@ import Worker from '../models/workerModel.js';
 import Facility from '../models/facilityModel.js';
 
 // create a new worker account
-const registerWorker = async (req, res) => {
+const registerWorker = async (workerData) => {
     const {
         fullname,
         email,
@@ -15,7 +15,7 @@ const registerWorker = async (req, res) => {
         specialty,
         yearsOfExperience,
         location
-    } = req.body;
+    } = workerData;
 
     
     // check for existing user
@@ -36,6 +36,7 @@ const registerWorker = async (req, res) => {
         password: hashedPassword,
         role: "worker"
     });
+
     // create worker profile
     const worker = await Worker.create({
         user: user._id,
@@ -51,10 +52,10 @@ const registerWorker = async (req, res) => {
 }
 
 // worker login
-const loginWorker = async (req, res)=> {
-   const { email, password } = req.body;
+const loginWorker = async (loginData)=> {
+   const { email, password } = loginData;
    
-   //find user by email
+   // find user by email
    const user = await User.findOne({ email });
    const isPasswordValid = await bcrypt.compare(password, user.password); // encrypt and compare password
 
@@ -63,12 +64,12 @@ const loginWorker = async (req, res)=> {
     throw new Error("Invalid email or password");
    }
 
-   // check verification status
+   // check account verification status
    if (!user.isVerified) {
     throw new Error("Your account is not verified. Please check your email for verification link.");
    }
 
-   // create token
+   // create token for the logged in user
    const token = jwt.sign({
     id: user._id,
     role: user.role

@@ -54,7 +54,7 @@ CAREPORIUM_API/
 ├── config/             env config, db connection, matching weights
 │   └── db.js           responsible for connecting the application to MongoDB Atlas
 │
-├── controllers/        the business logic for handling requests
+├── controllers/        the business logic for handling requests/response
 │
 ├── middleware/         middleware used between the incoming request and the controller
 │
