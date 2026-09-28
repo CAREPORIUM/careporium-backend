@@ -1,31 +1,53 @@
-import { registerWorker, loginWorker } from '../services/authservice.js';
-
+import { asyncWrapProviders } from "async_hooks";
+import {
+  registerWorker,
+  loginWorker,
+  registerFacility,
+} from "../services/authservice.js";
 const registerWorkerController = async (req, res) => {
-    try{
-        const result = await registerWorker(req, res);
-        res.status(201).json({
-            message: 'Account has been created successfully',
-            data: result
-        });
-    } catch(error) {
-        res.status(400).json({
-            message: error.message
-        });
-    }
+  try {
+    const result = await registerWorker(req, res);
+    res.status(201).json({
+      message: "Account has been created successfully",
+      data: result,
+    });
+  } catch (error) {
+    res.status(400).json({
+      message: error.message,
+    });
+  }
+};
+//sigup for facility role
+const registerFacilityController = async (req, res) => {
+  try {
+    const answer = await registerFacility(req, res);
+    res.status(201).json({
+      message: "Facility account has been created successfully",
+      data: asyncWrapProviders,
+    });
+  } catch (error) {
+    res.status(400).json({
+      message: error.message,
+    });
+  }
 };
 
 const loginWorkerController = async (req, res) => {
-    try{
-        const result = await loginWorker(req, res);
-        res.status(200).json({
-            messgae: 'Login successful',
-            data: result
-        })
-    } catch(error) {
-        res.status(401).json({
-            message: error.message
-        })
-    }
+  try {
+    const result = await loginWorker(req, res);
+    res.status(200).json({
+      messgae: "Login successful",
+      data: result,
+    });
+  } catch (error) {
+    res.status(401).json({
+      message: error.message,
+    });
+  }
 };
 
-export { registerWorkerController, loginWorkerController };
+export {
+  registerWorkerController,
+  loginWorkerController,
+  registerFacilityController,
+};
