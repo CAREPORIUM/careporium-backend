@@ -219,6 +219,18 @@ Run:
 npm run dev
 ```
 
+## Clinician Profile API
+
+Profiles and reviews are public. Saving a clinician and sending or reading messages require an `Authorization: Bearer <token>` header. The token must be signed with `JWT_SECRET` and contain the user's MongoDB ID as `sub`, `id`, or `_id`.
+
+* `GET /api/professionals/:id` returns the clinician profile, computed rating/review count, and `isSaved` when a valid token is provided.
+* `GET /api/professionals/:id/reviews?page=1&limit=10` returns the rating distribution and paginated reviews.
+* `POST /api/professionals/:id/save` and `DELETE /api/professionals/:id/save` save or unsave the profile for the signed-in user.
+* `GET /api/professionals/:id/messages?page=1&limit=30` returns the signed-in user's conversation with the clinician.
+* `POST /api/professionals/:id/messages` accepts `{ "text": "..." }` and creates a message.
+
+Create `Professional` and `Review` documents in MongoDB before requesting a profile. Profile fields include `fullName`, `title`, `specialty`, `bio`, `experienceYears`, `experience`, `skills`, `location`, `openToShifts`, `profileImage`, and `coverImage`. Reviews include `professionalId`, `reviewerName`, `reviewerRole`, `facilityName`, `rating`, and `comment`.
+
 Nodemon will automatically restart the server when changes are detected.
 
 Expected output:
