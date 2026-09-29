@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/userModel.js";
 import Worker from "../models/workerModel.js";
 import Facility from "../models/facilityModel.js";
-
+import cloudinary from "../config/cloudinary.js";
 // create a new worker account
 const registerWorker = async (req, res) => {
   const {
@@ -53,14 +53,15 @@ const registerFacility = async (req, res) => {
   const {
     facilityName,
     facilityType,
-    taxID,
-    businessEmail,
+    email,
     adminName,
     phoneNumber,
+    password,
+    location,
   } = req.body;
 
   // check for existing user
-  const existingUser = await User.findOne({ businessEmail });
+  const existingUser = await User.findOne({ email });
 
   if (existingUser) {
     throw new Error("This business email already exists!");
@@ -70,21 +71,43 @@ const registerFacility = async (req, res) => {
   const genSalt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, genSalt);
 
+  //certifcate or file uploads
+
+  const businessRegCertUpload = await cloudinary.uploader.upload(
+    req.files.businessRegCert[0].path,
+  );
+
+  const facilityLicenseUpload = await cloudinary.uploader.upload(
+    req.files.facilityLicense[0].path,
+  );
+
+  const TaxIDUpload = await cloudinary.uploader.upload(req.files.TaxID[0].path);
+  //get URls
+  const businessRegCert = businessRegCertUpload.secure_url;
+  const facilityLicense = facilityLicenseUpload.secure_url;
+  const TaxID = TaxIDUpload.secure_url;
   // create user account
   const user = await User.create({
     email,
     phoneNumber,
     password: hashedPassword,
+    location,
     role: "facility",
+    businessRegCert,
+    facilityLicense,
+    TaxID,
   });
   // create facility profile
-  const facility = await Worker.create({
+  const facility = await Facility.create({
     user: user._id,
-    fullName: fullname,
-    profession,
-    specialty,
-    yearsOfExperience,
+    facilityName,
+    facilityType,
+    adminName,
+    phoneNumber,
     location,
+    businessRegCert,
+    facilityLicense,
+    TaxID,
   });
 
   return { user, facility };

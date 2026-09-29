@@ -3,7 +3,8 @@ import {
   registerWorker,
   loginWorker,
   registerFacility,
-} from "../services/authservice.js";
+} from "../services/authService.js";
+import cloudinary from "../config/cloudinary.js";
 const registerWorkerController = async (req, res) => {
   try {
     const result = await registerWorker(req, res);
@@ -23,8 +24,14 @@ const registerFacilityController = async (req, res) => {
     const answer = await registerFacility(req, res);
     res.status(201).json({
       message: "Facility account has been created successfully",
-      data: asyncWrapProviders,
+      data: answer,
     });
+    if (!req.file) {
+      return res.status(400).json({
+        message:
+          "file is required to be uploaded....please upload the required file",
+      });
+    }
   } catch (error) {
     res.status(400).json({
       message: error.message,
