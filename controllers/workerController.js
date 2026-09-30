@@ -2,7 +2,7 @@ import { getWorkerProfile, updateWorkerProfile } from '../services/workerService
 
 // receives the retrieve worker's profile request and passes the request data to the...
 // ...getWorkerProfile service in workerService.js, which handles the retrieval logic 
-const getProfile = async (req, res) => {
+const getWProfile = async (req, res) => {
     try {
         const worker = await getWorkerProfile(req.user.id);
 
@@ -21,7 +21,7 @@ const getProfile = async (req, res) => {
 
 // receives the update worker's profile request and passes the request data to the...
 // ...updateWorkerProfile service in workerService.js, which handles the update logic 
-const updateProfile = async (req, res) => {
+const updateWProfile = async (req, res) => {
     try {
         const worker = await updateWorkerProfile(
             req.user.id,
@@ -41,4 +41,4 @@ const updateProfile = async (req, res) => {
     }
 };
 
-export { getProfile, updateProfile };
+export { getWProfile, updateWProfile };

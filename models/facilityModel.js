@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const facilitySchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-    facilityName: { type: String, required: true },
+    facilityName: { type: String, required: true, unique: true },
     facilityType: { type: String, required: true },
     location: { address: { type: String, required: true }, street: { type: String, required: true }, state: { type: String,
       enum: [
