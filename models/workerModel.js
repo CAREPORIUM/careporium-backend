@@ -48,8 +48,20 @@ const workerSchema = new mongoose.Schema(
             "Federal Capital Territory"
         ]}, country: { type: String } },
         proofOfLocation: { type: String, default: ""},
-        certifications: { professionalLicense: { type: String, default: "" }, 
-        idDocument: { type: String, default: ""}, educationCert: { type: String, unique: true } },
+        certifications: {
+            professionalLicense: {
+                url: { type: String, default: "" },
+                verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
+                verifiedAt: { type: Date }},
+            professionalLicense: {
+                url: { type: String, default: "" },
+                verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
+                verifiedAt: { type: Date }},
+            professionalLicense: {
+                url: { type: String, default: "" },
+                verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
+                verifiedAt: { type: Date }} 
+            },
         about: { type: String }
     }, { timestamps: true }
 )

@@ -48,21 +48,21 @@ const facilitySchema = new mongoose.Schema(
       country: { type: String, required: true }
     },
     businessRegCert: {
-      type: String,
-      required: true,
+      url: { type: String, required: true },
+      verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
+      verifiedAt: { type: Date }
     },
     facilityLicense: {
-      type: String,
-      required: true,
+      url: { type: String, required: true },
+      verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
+      verifiedAt: { type: Date }
     },
     TaxID: {
-      type: String,
-      Required: true,
-      unique: true,
-    },
+      url: { type: String, required: true },
+      verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
+      verifiedAt: { type: Date }},
     secondaryContact: { fullName: { type: String }, position: { type: String }, email: {type: String }, phoneNumber: { type: String } }
-  },
-  { timestamps: true },
+  }, { timestamps: true },
 );
 
 const Facility = mongoose.model("Facility", facilitySchema);
