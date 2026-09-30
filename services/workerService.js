@@ -2,7 +2,10 @@ import Worker from '../models/workerModel.js';
 
 // handles retrieval of worker's profile
 const getWorkerProfile = async (userId) => {
-    const worker = await Worker.findOne({ user: userId });
+    const worker = await Worker.findOne({ 
+        user: userId 
+    }).populate("user", 
+                "-password -verificationOtp -verificationOtpExpires");
 
     if (!worker) {
         throw new Error("Profile not found");

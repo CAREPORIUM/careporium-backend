@@ -3,11 +3,12 @@ import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
 import Worker from '../models/workerModel.js';
 import Facility from '../models/facilityModel.js';
+import { transporter } from './emailService.js';
 
 // create a new worker account
 const registerWorker = async (workerData) => {
     const {
-        fullname,
+        fullName,
         email,
         phoneNumber,
         password,
@@ -17,42 +18,154 @@ const registerWorker = async (workerData) => {
         location
     } = workerData;
 
-    
-    // check for existing user
-    const existingUser = await User.findOne({ email })
+    try {
+        // check if email already exists
+        const existingUser = await User.findOne({ email });
 
-    if(existingUser) {
-        throw new Error("Email already exists!")
+        if (existingUser) {
+            throw new Error("Email already exists!");
+        }
+
+        // hash password
+        const genSalt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, genSalt);
+
+        // create user account
+        const user = await User.create({
+            email,
+            phoneNumber,
+            password: hashedPassword,
+            role: "worker"
+        });
+
+        // generate a 6-digit verification OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // OTP expires in 5 minutes
+        const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
+
+        // save OTP and expiry
+        user.verificationOtp = otp;
+        user.verificationOtpExpires = otpExpires;
+
+        await user.save();
+
+        // create worker profile
+        const worker = await Worker.create({
+            user: user._id,
+            fullName,
+            profession,
+            specialty,
+            yearsOfExperience,
+            location
+        });
+
+        // send verification email
+        try {
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM,
+                to: user.email,
+                subject: 'Verify your Careporium account',
+                text: `Your Careporium verification code is ${otp}. It expires in 5 minutes.`
+            });
+        } catch (emailError) {
+            // Remove the created user and worker if email fails
+            await Worker.deleteOne({ _id: worker._id });
+            await User.deleteOne({ _id: user._id });
+
+            throw new Error("Account could not be created because the verification email could not be sent.");
+        }
+
+        return {
+            userId: user._id,
+            workerId: worker._id,
+        };
+
+    } catch (error) {
+        throw error;
+    }
+};
+
+// verify registered user's account using OTP sent to the user's email
+const verifyAccount = async (email, otp) =>{
+    const user = await User.findOne({ email })
+    if (!user) {
+        throw new Error('User not found')
     }
 
-    // hash password
-    const genSalt = await bcrypt.genSalt(10)
-    const hashedPassword = await bcrypt.hash(password, genSalt)
+    if (user.isVerified) {
+        throw new Error("Account is already verified");
+    }
 
-    // create user account
-    const user = await User.create({
-        email,
-        phoneNumber,
-        password: hashedPassword,
-        role: "worker"
-    });
+    if (!user.verificationOtp || !user.verificationOtpExpires) {
+        throw new Error("Verification OTP not found");
+    }
 
-    // create worker profile
-    const worker = await Worker.create({
-        user: user._id,
-        fullName: fullname,
-        profession,
-        specialty,
-        yearsOfExperience,
-        location
-    });
+    if (user.verificationOtpExpires < new Date()) {
+        throw new Error("Verification OTP has expired");
+    }
 
-    return { user, worker };
+    if (user.verificationOtp !== otp) {
+        throw new Error("Invalid verification OTP");
+    }
+
+    // mark the account as verified
+    user.isVerified = true;
+
+    // Remove the OTP after successful verification
+    user.verificationOtp = undefined;
+    user.verificationOtpExpires = undefined;
+
+    await user.save();
+
+    return {
+        userId: user._id,
+        email: user.email,
+        isVerified: user.isVerified
+    };
 
 }
 
+// Generates and sends a new verification OTP to the user's email.
+
+const resendVerificationOtp = async (email) => {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    if (user.isVerified) {
+        throw new Error("Account is already verified");
+    }
+
+    // Generate a new 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // OTP expires in 5 minutes
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
+
+    // Save the new OTP
+    user.verificationOtp = otp;
+    user.verificationOtpExpires = otpExpires;
+
+    await user.save();
+
+    // Send the new OTP
+    await transporter.sendMail({
+        from: `"Careporium" <${process.env.EMAIL_FROM}>`,
+        to: user.email,
+        subject: "Your new Careporium verification code",
+        text: `Your new Careporium verification code is ${otp}. It expires in 5 minutes.`
+    });
+
+    return {
+        message: "A new verification code has been sent to your email"
+    };
+};
+
 // worker login
-const loginWorker = async (loginData)=> {
+const loginUser = async (loginData)=> {
    const { email, password } = loginData;
    
    // find user by email
@@ -80,15 +193,37 @@ const loginWorker = async (loginData)=> {
    });
 
    return { 
-    token,
     user: {
      id: user._id,
      email: user.email,
      role: user.role,
-     isVerified: user.isVerified
+     token,
     }
    }
 
 }
 
-export { registerWorker, loginWorker }
+//delete user
+const deleteUser = async (userId) => {
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    // Delete worker profile if the user is a worker
+    if (user.role === "worker") {
+        await Worker.findOneAndDelete({ user: userId });
+    }
+
+    // Delete the main user account
+    await User.findByIdAndDelete(userId);
+
+    return {
+        message: "User deleted successfully"
+    };
+};
+
+
+export { registerWorker, verifyAccount, resendVerificationOtp, loginUser, deleteUser }
