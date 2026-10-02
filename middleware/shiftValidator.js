@@ -1,6 +1,7 @@
 import { body, validationResult } from "express-validator";
 
 const validateShift = [
+    // Validate the required fields before the request reaches the controller.
     body("role")
         .trim()
         .notEmpty()
@@ -72,15 +73,18 @@ const validateShift = [
         .withMessage("isUrgent must be a boolean"),
 
     (req, res, next) => {
+        // Collect any validation errors from the checks above.
         const errors = validationResult(req);
 
         if (!errors.isEmpty()) {
+            // Stop invalid requests before they reach the controller.
             return res.status(400).json({
                 message: "Validation failed",
                 errors: errors.array()
             });
         }
 
+        // Continue to the controller when all validation checks pass.
         next();
     }
 ];

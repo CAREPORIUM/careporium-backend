@@ -2,6 +2,7 @@ import Shift from "../models/shiftModel.js";
 import Facility from "../models/facilityModel.js";
 
 const createShift = async (userId, shiftData) => {
+    // Find the facility profile linked to the authenticated user.
     const facility = await Facility.findOne({
         user: userId
     });
@@ -10,6 +11,7 @@ const createShift = async (userId, shiftData) => {
         throw new Error("Facility profile not found");
     }
 
+    // Only allow fields that a facility is permitted to set when creating a shift.
     const allowedFields = [
         "role",
         "specialty",
@@ -27,12 +29,14 @@ const createShift = async (userId, shiftData) => {
 
     const filteredData = {};
 
+    // Ignore any fields that are not part of the allowed shift data.
     for (const field of allowedFields) {
         if (shiftData[field] !== undefined) {
             filteredData[field] = shiftData[field];
         }
     }
 
+    // Use the facility found from the authenticated user instead of trusting the client.
     const shift = await Shift.create({
         ...filteredData,
         facility: facility._id
@@ -42,6 +46,7 @@ const createShift = async (userId, shiftData) => {
 };
 
 const getShifts = async () => {
+    // Only return open shifts that are scheduled for today or a future date.
     const shifts = await Shift.find({
         status: "open",
         date: { $gte: new Date() }
@@ -51,6 +56,7 @@ const getShifts = async () => {
 
     return shifts;
 };
+
 const getShiftById = async (shiftId) => {
     const shift = await Shift.findById(shiftId);
 
@@ -60,7 +66,9 @@ const getShiftById = async (shiftId) => {
 
     return shift;
 };
+
 const updateShift = async (userId, shiftId, shiftData) => {
+    // Find the facility profile linked to the authenticated user.
     const facility = await Facility.findOne({
         user: userId
     });
@@ -75,10 +83,12 @@ const updateShift = async (userId, shiftId, shiftData) => {
         throw new Error("Shift not found");
     }
 
+    // Make sure the authenticated facility owns the shift before updating it.
     if (shift.facility.toString() !== facility._id.toString()) {
         throw new Error("You are not authorized to update this shift");
     }
 
+    // Only allow fields that a facility is permitted to update.
     const allowedFields = [
         "role",
         "specialty",
@@ -104,7 +114,9 @@ const updateShift = async (userId, shiftId, shiftData) => {
 
     return shift;
 };
+
 const deleteShift = async (userId, shiftId) => {
+    // Find the facility profile linked to the authenticated user.
     const facility = await Facility.findOne({
         user: userId
     });
@@ -119,6 +131,7 @@ const deleteShift = async (userId, shiftId) => {
         throw new Error("Shift not found");
     }
 
+    // Prevent a facility from deleting another facility's shift.
     if (shift.facility.toString() !== facility._id.toString()) {
         throw new Error("You are not authorized to delete this shift");
     }
@@ -127,4 +140,5 @@ const deleteShift = async (userId, shiftId) => {
 
     return shift;
 };
-export { createShift, getShifts, getShiftById,updateShift, deleteShift };
+
+export { createShift, getShifts, getShiftById, updateShift, deleteShift };
