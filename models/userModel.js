@@ -1,24 +1,47 @@
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
-  {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
+    {
+        email: {
+            type: String,
+            required: true,
+            unique: true,
+            lowercase: true,
+            trim: true
+        },
+
+        phoneNumber: {
+            type: String,
+            required: true
+        },
+
+        password: {
+            type: String,
+            required: true
+        },
+
+        role: {
+            type: String,
+            enum: ["worker", "facility", "admin"],
+            required: true
+        },
+
+        isVerified: {
+            type: Boolean,
+            default: false
+        },
+
+        verificationOtp: {
+            type: String
+        },
+
+        verificationOtpExpires: {
+            type: Date
+        }
     },
-    phoneNumber: { type: String, required: true },
-    password: { type: String, required: true },
-    role: {
-      type: String,
-      enum: ["worker", "facility", "admin"],
-      required: true,
-    },
-    isVerified: { type: Boolean, default: false },
-  },
-  { timestamps: true },
+    {
+        timestamps: true
+    }
 );
 
 const User = mongoose.model("User", userSchema);

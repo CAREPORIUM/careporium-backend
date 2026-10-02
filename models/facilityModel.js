@@ -2,19 +2,10 @@ import mongoose from "mongoose";
 
 const facilitySchema = new mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      unique: true,
-    },
-    facilityName: { type: String, required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+    facilityName: { type: String, required: true, unique: true },
     facilityType: { type: String, required: true },
-    adminName: { type: String, required: true },
-    phoneNumber: { type: String, required: true },
-    location: {
-      type: String,
-      required: true,
+    location: { address: { type: String, required: true }, city: { type: String, required: true }, state: { type: String,
       enum: [
         "Abia",
         "Adamawa",
@@ -53,23 +44,25 @@ const facilitySchema = new mongoose.Schema(
         "Yobe",
         "Zamfara",
         "Federal Capital Territory",
-      ],
+      ]},
+      country: { type: String, required: true }
     },
     businessRegCert: {
-      type: String,
-      required: true,
+      businessRegCert_URL: { type: String, required: true },
+      verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
+      verifiedAt: { type: Date }
     },
     facilityLicense: {
-      type: String,
-      required: true,
+      facilityLicense_URL: { type: String, required: true },
+      verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
+      verifiedAt: { type: Date }
     },
-    TaxID: {
-      type: String,
-      Required: true,
-      unique: true,
-    },
-  },
-  { timestamps: true },
+    taxID: {
+      taxID_URL: { type: String, required: true },
+      verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
+      verifiedAt: { type: Date }},
+    secondaryContact: { fullName: { type: String }, position: { type: String }, email: {type: String }, phoneNumber: { type: String } }
+  }, { timestamps: true },
 );
 
 const Facility = mongoose.model("Facility", facilitySchema);
