@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import User from '../models/userModel.js';
 import Worker from '../models/workerModel.js';
 import Facility from '../models/facilityModel.js';
@@ -102,17 +103,29 @@ const registerWorker = async (workerData) => {
 
 
 // register facility
-
 const registerFacility = async (req) => {
+
     const {
         facilityName,
         facilityType,
         email,
         phoneNumber,
-        password,
-        location,
-        secondaryContact
-      } = req.body;
+        password
+    } = req.body;
+
+    const location = {
+        address: req.body["location.address"],
+        city: req.body["location.city"],
+        state: req.body["location.state"],
+        country: req.body["location.country"]
+    };
+
+    const secondaryContact = {
+        fullName: req.body["secondaryContact.fullName"],
+        position: req.body["secondaryContact.position"],
+        email: req.body["secondaryContact.email"],
+        phoneNumber: req.body["secondaryContact.phoneNumber"]
+    };
 
 
     // check if email already exists
@@ -123,11 +136,10 @@ const registerFacility = async (req) => {
     }
 
     // check required documents
-    if (
-        !req.files ||
+    if (!req.files ||
         !req.files.businessRegCert ||
         !req.files.facilityLicense ||
-        !req.files.TaxID
+        !req.files.taxID
     ) {
         throw new Error(
             'Business registration certificate, facility license and Tax ID are required.'
@@ -151,24 +163,30 @@ const registerFacility = async (req) => {
         );
 
     // upload Tax ID
-    const TaxIDUpload =
+    const taxIDUpload =
         await cloudinary.uploader.upload(
-            req.files.TaxID[0].path
+            req.files.taxID[0].path
         );
 
-    const businessRegCert = businessRegCertUpload.secure_url;
-    const facilityLicense = facilityLicenseUpload.secure_url;
-    const TaxID = TaxIDUpload.secure_url;
+    const businessRegCert_URL = businessRegCertUpload.secure_url;
+    const facilityLicense_URL = facilityLicenseUpload.secure_url;
+    const taxID_URL = taxIDUpload.secure_url;
+    
+    const session = await mongoose.startSession();
+      try {
+
+          session.startTransaction();
 
     // create facility user account
-    const user = await User.create({
+    const users = await User.create([{
         email,
         phoneNumber,
         password: hashedPassword,
         role: 'facility',
         isVerified: false
-    });
+    }], { session })
 
+    const user = users[0];
 
     // generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -180,31 +198,47 @@ const registerFacility = async (req) => {
     user.verificationOtp = otp;
     user.verificationOtpExpires = otpExpires;
 
-    await user.save();
+    await user.save({ session });
 
 
     // create facility profile
-    const facility = await Facility.create({
-        user: user._id,
-        facilityName,
-        facilityType,
-        location: {
-            address: location.address,
-            street: location.street,
-            state: location.state,
-            country: location.country
-        },
-        businessRegCert,
-        facilityLicense,
-        TaxID,
-        secondaryContact: {
-            fullName: secondaryContact.fullName,
-            position: secondaryContact.position,
-            email: secondaryContact.email,
-            phoneNumber: secondaryContact.phoneNumber
-        }
-    });
+    const facilities = await Facility.create([{
+    user: user._id,
+    facilityName,
+    facilityType,
+    location: {
+        address: location.address,
+        city: location.city,
+        state: location.state,
+        country: location.country
+    },
 
+    secondaryContact: {
+        fullName: secondaryContact.fullName,
+        position: secondaryContact.position,
+        email: secondaryContact.email,
+        phoneNumber: secondaryContact.phoneNumber
+    },
+
+    businessRegCert: {
+        businessRegCert_URL: businessRegCert_URL
+    },
+
+    facilityLicense: {
+        facilityLicense_URL: facilityLicense_URL
+    },
+
+    taxID: {
+        taxID_URL: taxID_URL
+    }
+}], {session})
+
+    const facility = facilities[0];
+
+    await session.commitTransaction();
+
+    await session.endSession();
+    
     // send verification OTP
     try {
 
@@ -216,18 +250,64 @@ const registerFacility = async (req) => {
         });
 
     } catch (emailError) {
-        // roll back both records if email fails
-        await Facility.deleteOne({ _id: facility._id });
-        await User.deleteOne({ _id: user._id });
+        console.error(
+          'Verification email could not be sent:',
+                emailError
+            );
 
-        throw new Error(
-            'Facility account could not be created because the verification email could not be sent.'
-        );
     }
+
     return {
         userId: user._id,
         facilityId: facility._id
     };
+} catch (error) {
+
+    await session.abortTransaction();
+
+    await session.endSession();
+
+
+      try {
+
+            if (businessRegCertUpload?.public_id) {
+
+                await cloudinary.uploader.destroy(
+                    businessRegCertUpload.public_id
+                );
+
+            }
+
+
+            if (facilityLicenseUpload?.public_id) {
+
+                await cloudinary.uploader.destroy(
+                    facilityLicenseUpload.public_id
+                );
+
+            }
+
+
+            if (taxIDUpload?.public_id) {
+
+                await cloudinary.uploader.destroy(
+                    taxIDUpload.public_id
+                );
+
+            }
+
+        } catch (cloudinaryError) {
+
+            console.error(
+                'Cloudinary cleanup failed:',
+                cloudinaryError
+            );
+
+        }
+
+
+        throw error;
+    }
 };
 
 // verify user account
@@ -266,7 +346,6 @@ const verifyAccount = async (email, otp) => {
         isVerified: user.isVerified
     };
 }
-
 
 
 // resend verification OTP
@@ -311,18 +390,25 @@ const loginUser = async (loginData) => {
     } = loginData;
     
     const user = await User.findOne({ email });
-    const isPasswordValid = await bcrypt.compare(password, user.password); // encrypt and compare password
-    
-    if (!user || !isPasswordValid) {
+      if (!user) {
         throw new Error('Invalid email or password');
       }
 
-    /* * // check account verification
+      const isPasswordValid = await bcrypt.compare(
+        password,
+        user.password
+      );
+
+      if (!isPasswordValid) {
+        throw new Error('Invalid email or password');
+      }
+
+    // check account verification
     if (!user.isVerified) {
         throw new Error(
             'Your account is not verified. Please check your email for your verification code.'
         );
-    }  */
+    }  
 
     // Generate JWT
     const token = jwt.sign(
