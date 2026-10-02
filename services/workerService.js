@@ -54,6 +54,9 @@ const updateWorkerProfile = async (userId, updateData) => {
     ).populate(
         'user', '-password -verificationOtp -verificationOtpExpires'
     );
+// handles updating of worker's profile 
+const updateWorkerProfile = async (userId, updateData) => {
+    const worker = await Worker.findOneAndUpdate({ user: userId }, updateData,{ new: true, runValidators: true });
 
     if (!worker) {
         throw new Error('Profile not found');
