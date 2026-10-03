@@ -1,8 +1,10 @@
-import { getWorkerProfile, updateWorkerProfile } from '../services/workerService.js';
+import {
+    getWorkerProfile,
+    updateWorkerProfile
+} from '../services/workerService.js';
 
-// receives the retrieve worker's profile request and passes the request data to the...
-// ...getWorkerProfile service in workerService.js, which handles the retrieval logic 
-const getWProfile = async (req, res) => {
+// handles retrieval of worker's profile
+/** const getWProfile = async (req, res) => {
     try {
         const worker = await getWorkerProfile(req.user.id);
 
@@ -17,19 +19,42 @@ const getWProfile = async (req, res) => {
             message: error.message
         });
     }
+}; */
+const getWProfile = async (req, res) => {
+    try {
+        console.log('USER FROM TOKEN:', req.user);
+
+        const worker = await getWorkerProfile(req.user.id);
+
+        res.status(200).json({
+            success: true,
+            data: worker
+        });
+
+    } catch (error) {
+        console.log('WORKER PROFILE ERROR:', error);
+
+        res.status(404).json({
+            success: false,
+            message: error.message
+        });
+    }
 };
 
-// receives the update worker's profile request and passes the request data to the...
-// ...updateWorkerProfile service in workerService.js, which handles the update logic 
+// handles updating of worker's profile
 const updateWProfile = async (req, res) => {
     try {
+        // send the user's profile information and uploaded files...
+        // ...to the worker service
         const worker = await updateWorkerProfile(
             req.user.id,
-            req.body
+            req.body,
+            req.files
         );
 
         res.status(200).json({
             success: true,
+            message: 'Worker profile updated successfully',
             data: worker
         });
 
@@ -41,4 +66,7 @@ const updateWProfile = async (req, res) => {
     }
 };
 
-export { getWProfile, updateWProfile };
+export {
+    getWProfile,
+    updateWProfile
+};

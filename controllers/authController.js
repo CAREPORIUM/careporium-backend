@@ -1,11 +1,5 @@
-import {
-    registerWorker,
-    registerFacility,
-    verifyAccount,
-    resendVerificationOtp,
-    loginUser,
-    deleteUser
-} from '../services/authService.js';
+import { registerWorker, registerFacility, verifyAccount, resendVerificationOtp,
+         loginUser, getProfile, deleteUser} from '../services/authservice.js';
 
 // worker registration 
 const registerWorkerController = async (req, res) => {
@@ -106,6 +100,24 @@ const loginUserController = async (req, res) => {
     }
 };
 
+// get user profile
+const getProfileController = async (req, res) => {
+    try {
+        const user = await getProfile(req.user.id);
+
+        res.status(200).json({
+            success: true,
+            data: user
+        });
+
+    } catch (error) {
+        res.status(404).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
 
 // delete user
 const deleteUserController = async (req, res) => {
@@ -136,5 +148,6 @@ export {
     verifyAccountController,
     resendVerificationOtpController,
     loginUserController,
+    getProfileController,
     deleteUserController
 };

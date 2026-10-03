@@ -47,20 +47,23 @@ const workerSchema = new mongoose.Schema(
             "Zamfara",
             "Federal Capital Territory"
         ]}, country: { type: String } },
-        proofOfLocation: { type: String, default: ""},
+        proofOfLocation: {
+                url: { type: String, default: "" },
+                verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
+                verificationComment: { type: String, default: "" }, verifiedAt: { type: Date }}, 
         certifications: {
             professionalLicense: {
                 url: { type: String, default: "" },
                 verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
-                verifiedAt: { type: Date }},
-            professionalLicense: {
+                verificationComment: { type: String, default: "" }, verifiedAt: { type: Date }}, 
+            idDocument: {
                 url: { type: String, default: "" },
                 verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
-                verifiedAt: { type: Date }},
-            professionalLicense: {
+                verificationComment: { type: String, default: "" }, verifiedAt: { type: Date }}, 
+            educationCert:{
                 url: { type: String, default: "" },
                 verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
-                verifiedAt: { type: Date }} 
+                verificationComment: { type: String, default: "" }, verifiedAt: { type: Date }}, 
             },
         about: { type: String }
     }, { timestamps: true }

@@ -381,8 +381,8 @@ const resendVerificationOtp = async (email) => {
     };
 };
 
-// login user
 
+// login user
 const loginUser = async (loginData) => {
     const {
         email,
@@ -433,12 +433,20 @@ const loginUser = async (loginData) => {
     };
 };
 
+// get user profile
+const getProfile = async (userId) => {
+    const user = await User.findById(userId).select(
+        '-password -verificationOtp -verificationOtpExpires'
+    );
 
+    if (!user) {
+        throw new Error('User not found');
+    }
 
-// ==========================================
-// DELETE USER
-// ==========================================
+    return user;
+};
 
+// delete user account and associated profile
 const deleteUser = async (userId) => {
 
     // Find user
@@ -478,18 +486,13 @@ const deleteUser = async (userId) => {
     };
 };
 
-
-
-// ==========================================
-// EXPORT SERVICES
-// ==========================================
-
 export {
     registerWorker,
     registerFacility,
     verifyAccount,
     resendVerificationOtp,
     loginUser,
+    getProfile,
     deleteUser
 };
 

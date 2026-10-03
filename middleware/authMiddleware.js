@@ -1,6 +1,5 @@
 import jwt from "jsonwebtoken";
 
-
 // authenticates user before authorization (allowing access to protected routes)
 const authMiddleware = (req, res, next) => {
 
