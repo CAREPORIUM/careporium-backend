@@ -2,6 +2,7 @@ import express from "express";
 import 'dotenv/config';
 import cors from "cors";
 import connectDB from "./config/db.js";
+import shiftsRouter from "./routes/shiftsRoutes.js";
 
 connectDB();
 
@@ -11,6 +12,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use("/api/shifts/v1", shiftsRouter);
 
 app.get("/", (req, res) =>{
     res.json({

@@ -284,6 +284,40 @@ The health endpoint can be used to quickly confirm that the backend server is ru
 
 ---
 
+## Search open shifts
+
+```http
+GET /api/shifts/v1/
+```
+
+Supported query parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `q` | Case-insensitive partial search across role, specialty, and facility name |
+| `profession` | Exact role filter (the current Shift model stores role, not profession) |
+| `specialty` | Exact specialty filter |
+| `dateFrom` | First calendar date to include, in `YYYY-MM-DD` format |
+| `dateTo` | Last calendar date to include, in `YYYY-MM-DD` format |
+| `shiftType` | Exact shift type filter |
+| `minPay` | Minimum pay rate in naira |
+| `city` | Exact shift city filter |
+| `state` | Exact shift state filter |
+| `page` | One-based page number; defaults to `1` |
+| `limit` | Results per page, from `1` to `50`; defaults to `20` |
+
+Only open shifts that have not started are returned. Free-text search checks shift role, specialty, and the linked facility name. Date boundaries are interpreted as UTC calendar dates. Invalid filters return `400`. The current shift/location schemas do not contain coordinates, so distance radius filtering is not supported.
+
+Example:
+
+```http
+GET /api/shifts/v1/?q=nurse&profession=Registered%20Nurse&specialty=Acute%20Care&dateFrom=2026-10-06&dateTo=2026-10-12&shiftType=Day%20shift&minPay=3000&city=Lagos&state=Lagos
+```
+
+The existing response shape is preserved: results are in `data`, with `message` and `pagination` metadata (`page`, `limit`, `total`, and `totalPages`).
+
+---
+
 # 🔐 Environment Variables
 
 The application currently expects:
