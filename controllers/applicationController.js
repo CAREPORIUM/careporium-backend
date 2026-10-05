@@ -16,7 +16,7 @@ const applyForShift = async (req, res) => {
 //worker views all their applications
 const getMyApplications = async (req, res) => {
   try {
-    const workerId = req.user.id;
+    const userId = req.user.id;
     const applications =
       await applicationService.getApplicationsForWorker(userId);
     res.status(200).json({
