@@ -1,4 +1,5 @@
 import Shift from "../models/shiftModel.js";
+
 import Facility from "../models/facilityModel.js";
 
 const createShift = async (userId, shiftData) => {
@@ -16,15 +17,18 @@ const createShift = async (userId, shiftData) => {
         "role",
         "specialty",
         "workType",
-        "description",
-        "requirements",
+        "responsibilities",
+        "requiredCredentials",
         "date",
         "startTime",
         "endTime",
         "shiftType",
         "location",
         "payRate",
-        "isUrgent"
+        "isUrgent",
+        "professionalsNeeded",
+        "minimumExperience",
+        "arrivalInstructions"
     ];
 
     const filteredData = {};
@@ -93,15 +97,18 @@ const updateShift = async (userId, shiftId, shiftData) => {
         "role",
         "specialty",
         "workType",
-        "description",
-        "requirements",
+        "responsibilities",
+        "requiredCredentials",
         "date",
         "startTime",
         "endTime",
         "shiftType",
         "location",
         "payRate",
-        "isUrgent"
+        "isUrgent",
+        "professionalsNeeded",
+        "minimumExperience",
+        "arrivalInstructions"
     ];
 
     for (const field of allowedFields) {

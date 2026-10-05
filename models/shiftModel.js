@@ -25,13 +25,31 @@ const shiftSchema = new mongoose.Schema(
             trim: true
         },
 
-        description: {
+        responsibilities: {
             type: String,
             required: true,
             trim: true
         },
 
-        requirements: {
+        requiredCredentials: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        professionalsNeeded: {
+            type: Number,
+            required: true,
+            min: 1
+        },
+
+        minimumExperience: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+
+        arrivalInstructions: {
             type: String,
             trim: true
         },
@@ -56,7 +74,7 @@ const shiftSchema = new mongoose.Schema(
         shiftType: {
             type: String,
             required: true,
-            trim:true
+            trim: true
         },
 
         location: {

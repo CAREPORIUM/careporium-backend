@@ -16,14 +16,15 @@ const validateShift = [
         .notEmpty()
         .withMessage("Work type is required"),
 
-    body("description")
+    body("responsibilities")
         .trim()
         .notEmpty()
-        .withMessage("Description is required"),
+        .withMessage("Responsibilities are required"),
 
-    body("requirements")
-        .optional()
-        .trim(),
+    body("requiredCredentials")
+        .trim()
+        .notEmpty()
+        .withMessage("Required credentials are required"),
 
     body("date")
         .isISO8601()
@@ -44,6 +45,14 @@ const validateShift = [
         .notEmpty()
         .withMessage("Shift type is required"),
 
+    body("professionalsNeeded")
+        .isInt({ min: 1 })
+        .withMessage("Professionals needed must be at least 1"),
+
+    body("minimumExperience")
+        .isInt({ min: 0 })
+        .withMessage("Minimum experience cannot be negative"),
+
     body("location")
         .isObject()
         .withMessage("Location is required"),
@@ -62,6 +71,10 @@ const validateShift = [
         .trim()
         .notEmpty()
         .withMessage("Location state is required"),
+
+    body("arrivalInstructions")
+        .optional()
+        .trim(),
 
     body("payRate")
         .isFloat({ min: 0 })
