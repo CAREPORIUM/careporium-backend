@@ -6,6 +6,8 @@ import cors from "cors";
 import shiftRoutes from "./routes/shiftRoutes.js";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
+import shiftAssignmentRoutes from "./routes/shiftAssignmentRoutes.js";
+
 
 connectDB();
 
@@ -31,6 +33,8 @@ app.get("/health", (req, res) => {
 
 app.use("/api/auth/v1", authRoutes);
 app.use("/api/shifts/v1", shiftRoutes);
+app.use("/api/assignments", shiftAssignmentRoutes);
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
