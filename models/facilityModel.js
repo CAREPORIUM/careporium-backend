@@ -59,7 +59,12 @@ const facilitySchema = new mongoose.Schema(
       taxID_URL: { type: String, required: true },
       verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
       verificationComment: { type: String, default: "" }, verifiedAt: { type: Date }},
-      
+    verificationStatus: {
+    type: String,
+    enum: ["pending", "verified", "rejected"],
+    default: "pending"
+    },
+
     secondaryContact: { fullName: { type: String, default: ""}, position: { type: String, default: "" }, 
     email: { type: String, default: "" }, phoneNumber: { type: String, default: "" } }
   }, { timestamps: true },

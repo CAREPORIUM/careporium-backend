@@ -17,7 +17,6 @@ const getFacilityProfile = async (userId) => {
 }
 
 
-
 // handles updating of facility's profile
 const updateFacilityProfile = async (userId, updateData) => {
 
@@ -25,7 +24,6 @@ const updateFacilityProfile = async (userId, updateData) => {
     const allowedFields = [
         'facilityName',
         'facilityType',
-        'secondaryContact'
     ];
 
     const filteredData = {};
@@ -37,36 +35,36 @@ const updateFacilityProfile = async (userId, updateData) => {
     }
 
         // check if any location information was provided
-    if (
-        updateData.address !== undefined ||
-        updateData.city !== undefined ||
-        updateData.state !== undefined ||
-        updateData.country !== undefined
-    ) {
-
-        // create the location object
-        filteredData.location = {
-            address: updateData.address,
-            city: updateData.city,
-            state: updateData.state,
-            country: updateData.country
-        };
-    }
+// Check if any location information was provided
+if (
+    updateData.locationaddress !== undefined ||
+    updateData.locationcity !== undefined ||
+    updateData.locationstate !== undefined ||
+    updateData.locationcountry !== undefined
+) {
+    // Create the location object
+    filteredData.location = {
+        address: updateData.locationaddress,
+        city: updateData.locationcity,
+        state: updateData.locationstate,
+        country: updateData.locationcountry
+    };
+}
 
     // check if any secondary contact information was provided
     if (
-        updateData.secondaryContactFullName !== undefined ||
-        updateData.secondaryContactPosition !== undefined ||
-        updateData.secondaryContactEmail !== undefined ||
-        updateData.secondaryContactPhoneNumber !== undefined
+        updateData.secondaryContactfullName !== undefined ||
+        updateData.secondaryContactposition !== undefined ||
+        updateData.secondaryContactemail !== undefined ||
+        updateData.secondaryContactphoneNumber !== undefined
     ) {
 
         // create the secondary contact object
         filteredData.secondaryContact = {
-        fullName: updateData.secondaryContactFullName,
-        position: updateData.secondaryContactPosition,
-        email: updateData.secondaryContactEmail,
-        phoneNumber: updateData.secondaryContactPhoneNumber
+        fullName: updateData.secondaryContactfullName,
+        position: updateData.secondaryContactposition,
+        email: updateData.secondaryContactemail,
+        phoneNumber: updateData.secondaryContactphoneNumber
     };
     }
 

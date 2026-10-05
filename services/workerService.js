@@ -1,5 +1,7 @@
 import Worker from '../models/workerModel.js';
 import cloudinary from '../config/cloudinary.js';
+import User from '../models/userModel.js';
+import bcrypt from 'bcryptjs';
 
 // handles retrieval of worker's profile
 const getWorkerProfile = async (userId) => {
@@ -43,18 +45,18 @@ const updateWorkerProfile = async (userId, updateData, files) => {
 
    // check if any location information was provided
     if (
-        updateData.address !== undefined ||
-        updateData.street !== undefined ||
-        updateData.state !== undefined ||
-        updateData.country !== undefined
+        updateData.locationAddress !== undefined ||
+        updateData.locationStreet !== undefined ||
+        updateData.locationState !== undefined ||
+        updateData.locationCountry !== undefined
     ) {
 
         // create the location object
         filteredData.location = {
-            address: updateData.address,
-            street: updateData.street,
-            state: updateData.state,
-            country: updateData.country
+            address: updateData.locationAddress,
+            street: updateData.locationStreet,
+            state: updateData.locationState,
+            country: updateData.locationCountry
         };
     }
 
@@ -66,13 +68,32 @@ const updateWorkerProfile = async (userId, updateData, files) => {
         throw new Error('Profile not found');
     }
 
+    // handle password change separately because
+    // the password belongs to the User model, not the Worker model
+if (updateData.password !== undefined) {
+    if (!updateData.password || updateData.password.trim() === '') {
+        throw new Error('Password cannot be empty');
+    }
+
+    // Hash the new password before saving it
+    const hashedPassword = await bcrypt.hash(updateData.password, 10);
+
+    // Find the user's account
+    const user = await User.findById(userId);
+
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    // Update the user's password
+    user.password = hashedPassword;
+
+    // Save the updated user
+    await user.save();
+}
+
     // update the worker's profile information
     Object.assign(worker, filteredData);
-
-
-    // ==========================================
-    // HANDLE WORKER DOCUMENTS
-    // ==========================================
 
     // make sure the certifications object exists
     if (!worker.certifications) {
@@ -98,7 +119,6 @@ const updateWorkerProfile = async (userId, updateData, files) => {
     if (!worker.proofOfLocation) {
         worker.proofOfLocation = {};
     }
-
 
     // check if a professional license was uploaded
     if (files?.professionalLicense?.[0]) {

@@ -1,16 +1,14 @@
 import { registerWorker, registerFacility, verifyAccount, resendVerificationOtp,
-         loginUser, getProfile, deleteUser} from '../services/authservice.js';
+         loginUser, getProfile, deleteUser } from '../services/authService.js';
 
-// worker registration 
+// handles worker's registeration
 const registerWorkerController = async (req, res) => {
     try {
         const result = await registerWorker(req.body);
-
         res.status(201).json({
             message: 'Account created successfully. Please check your email for your verification code.',
             data: result
         });
-
     } catch (error) {
         res.status(400).json({
             message: error.message
@@ -18,107 +16,52 @@ const registerWorkerController = async (req, res) => {
     }
 };
 
-
-// facility registration
+// handles facility's registration
 const registerFacilityController = async (req, res) => {
     try {
-         const result = await registerFacility(req, res);
-       /* * if (!req.file) {
-            return res.status(400).json({
-                message: 'File is required. Please upload the required document.'
-            });
-        } */
-
+        const result = await registerFacility(req, res);
         res.status(201).json({
             message: 'Facility account has been created successfully',
             data: result
         });
-
     } catch (error) {
-  try {
-    const answer = await registerFacility(req, res);
-    res.status(201).json({
-      message: "Facility account has been created successfully",
-      data: asyncWrapProviders,
-    });
-  } catch (error) {
-    res.status(400).json({
-      message: error.message,
-    });
-  }
-import { registerWorker, loginWorker } from '../services/authService.js';
-
-// receives the worker registration request and passes the request data to the...
-// ...registerWorker service in authService.js, which handles the registration logic 
-const registerWorkerController = async (req, res) => {
-    try{
-        const result = await registerWorker(req.body);
-        res.status(201).json({
-            message: 'Account has been created successfully',
-            data: result
-        });
-    } catch(error) {
         res.status(400).json({
             message: error.message
         });
     }
 };
 
-
-// verify the OTP sent to the user's email
+// verifies a user's account using the provided OTP
 const verifyAccountController = async (req, res) => {
     try {
         const { email, otp } = req.body;
-
         const result = await verifyAccount(email, otp);
-
         res.status(200).json({
             message: 'Account verified successfully. You can proceed to log into your account.',
             data: result
         });
-
     } catch (error) {
         res.status(400).json({
             message: error.message
         });
     }
-// receives the worker login request and passes the login data to the...
-// ...loginWorker service in authService, which handles authentication and token generation.
-const loginWorkerController = async (req, res) => {
-  try {
-    const result = await loginWorker(req, res);
-    res.status(200).json({
-      messgae: "Login successful",
-      data: result,
-    });
-  } catch (error) {
-    res.status(401).json({
-      message: error.message,
-    });
-  }
 };
 
-
-// resend verification OTP incase the 
-// user did not get OTP the first time
+// resend OTP for account verification
 const resendVerificationOtpController = async (req, res) => {
     try {
         const { email } = req.body;
-
         const result = await resendVerificationOtp(email);
-
         res.status(200).json({
             message: 'A new verification code has been sent to your email',
             data: result
         });
-
     } catch (error) {
         res.status(400).json({
             message: error.message
         });
     }
 };
-
 
 // user login
 const loginUserController = async (req, res) => {
@@ -129,7 +72,6 @@ const loginUserController = async (req, res) => {
             message: 'Login successful',
             data: result
         });
-
     } catch (error) {
         res.status(400).json({
             message: error.message
@@ -141,12 +83,10 @@ const loginUserController = async (req, res) => {
 const getProfileController = async (req, res) => {
     try {
         const user = await getProfile(req.user.id);
-
         res.status(200).json({
             success: true,
             data: user
         });
-
     } catch (error) {
         res.status(404).json({
             success: false,
@@ -155,22 +95,17 @@ const getProfileController = async (req, res) => {
     }
 };
 
-
-// delete user
+// delete user's profile
 const deleteUserController = async (req, res) => {
     try {
         const result = await deleteUser(req.params.userId);
-
         res.status(200).json(result);
-
     } catch (error) {
-
         if (error.message === 'User not found') {
             return res.status(404).json({
                 message: 'User not found'
             });
         }
-
         res.status(500).json({
             message: 'Failed to delete user',
             error: error.message
@@ -178,13 +113,5 @@ const deleteUserController = async (req, res) => {
     }
 };
 
-
-export {
-    registerWorkerController,
-    registerFacilityController,
-    verifyAccountController,
-    resendVerificationOtpController,
-    loginUserController,
-    getProfileController,
-    deleteUserController
-};
+export { registerWorkerController, registerFacilityController, verifyAccountController, resendVerificationOtpController,
+         loginUserController,   getProfileController, deleteUserController};
