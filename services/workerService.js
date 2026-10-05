@@ -12,11 +12,11 @@ const getWorkerProfile = async (userId) => {
         "-password -verificationOtp -verificationOtpExpires"
     );
 
-    if (!worker) {
-        throw new Error("Profile not found");
-    }
+  if (!worker) {
+    throw new Error("Profile not found");
+  }
 
-    return worker;
+  return worker;
 };
 
 // handles updating of worker's profile
@@ -30,18 +30,18 @@ const updateWorkerProfile = async (userId, updateData, files) => {
         'about'
     ];
 
-    // create an empty object to store the fields...
-    // ...that the user is allowed to update
-    const filteredData = {};
+  // create an empty object to store the fields...
+  // ...that the user is allowed to update
+  const filteredData = {};
 
-    // go through each allowed field
-    for (const field of allowedFields) {
-        // check if the user actually provided this field
-        if (updateData[field] !== undefined) {
-            // add the field and its value to filteredData
-            filteredData[field] = updateData[field];
-        }
+  // go through each allowed field
+  for (const field of allowedFields) {
+    // check if the user actually provided this field
+    if (updateData[field] !== undefined) {
+      // add the field and its value to filteredData
+      filteredData[field] = updateData[field];
     }
+  }
 
    // check if any location information was provided
     if (

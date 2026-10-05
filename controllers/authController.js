@@ -2,36 +2,48 @@ import { registerWorker, registerFacility, verifyAccount, resendVerificationOtp,
          loginUser, getProfile, deleteUser } from '../services/authService.js';
 
 // handles worker's registeration
+// worker registration
 const registerWorkerController = async (req, res) => {
-    try {
-        const result = await registerWorker(req.body);
-        res.status(201).json({
-            message: 'Account created successfully. Please check your email for your verification code.',
-            data: result
-        });
-    } catch (error) {
-        res.status(400).json({
-            message: error.message
-        });
-    }
+  try {
+    const result = await registerWorker(req.body);
+
+    res.status(201).json({
+      message:
+        "Account created successfully. Please check your email for your verification code.",
+      data: result,
+    });
+  } catch (error) {
+    res.status(400).json({
+      message: error.message,
+    });
+  }
 };
 
 // handles facility's registration
 const registerFacilityController = async (req, res) => {
-    try {
-        const result = await registerFacility(req, res);
-        res.status(201).json({
-            message: 'Facility account has been created successfully',
-            data: result
-        });
-    } catch (error) {
-        res.status(400).json({
-            message: error.message
-        });
-    }
+  try {
+    const result = await registerFacility(req, res);
+    /* * if (!req.file) {
+            return res.status(400).json({
+                message: 'File is required. Please upload the required document.'
+            });
+        } */
+
+    res.status(201).json({
+      message: "Facility account has been created successfully",
+      data: result,
+    });
+  } catch (error) {
+    res.status(400).json({
+      message: error.message,
+    });
+  }
 };
 
-// verifies a user's account using the provided OTP
+// receives the worker registration request and passes the request data to the...
+// ...registerWorker service in authService.js, which handles the registration logic
+
+// verify the OTP sent to the user's email
 const verifyAccountController = async (req, res) => {
     try {
         const { email, otp } = req.body;
@@ -47,7 +59,9 @@ const verifyAccountController = async (req, res) => {
     }
 };
 
-// resend OTP for account verification
+
+// resend verification OTP incase the 
+// user did not get OTP the first time
 const resendVerificationOtpController = async (req, res) => {
     try {
         const { email } = req.body;
@@ -65,8 +79,8 @@ const resendVerificationOtpController = async (req, res) => {
 
 // user login
 const loginUserController = async (req, res) => {
-    try {
-        const result = await loginUser(req.body);
+  try {
+    const result = await loginUser(req.body);
 
         res.status(200).json({
             message: 'Login successful',

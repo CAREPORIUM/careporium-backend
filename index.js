@@ -9,6 +9,7 @@ import workerRoutes from "./routes/workerRoutes.js";
 import facilityRoutes from "./routes/facilityRoutes.js";
 import adminRoutes from './routes/adminRoutes.js';
 import authRoutes from "./routes/authRoutes.js";
+import applicationRoutes from "./routes/applicationRoutes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./config/swagger.js";
 
@@ -46,7 +47,7 @@ app.use("/api/auth/v1", authRoutes);
 app.use("/api/worker/v1", workerRoutes);
 app.use("/api/facility/v1", facilityRoutes);
 app.use("/api/shifts/v1", shiftRoutes);
-app.use('/api/admin/v1', adminRoutes);
+app.use("/api/applications/v1", applicationRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
