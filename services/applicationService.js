@@ -36,9 +36,7 @@ const applyForShift = async (userId, shiftId) => {
   });
   return application;
 };
-
 //get all my applications for a worker
-
 const getApplicationsForWorker = async (userId) => {
   const worker = await Worker.findOne({ user: userId });
   if (!worker) {

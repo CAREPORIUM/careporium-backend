@@ -39,11 +39,11 @@ const registerFacilityController = async (req, res) => {
       message: "Facility account has been created successfully",
       data: result,
     });
-  } catch (error) {
-    res.status(400).json({
-      message: error.message,
-    });
-  }
+ } catch (error) {
+  res.status(400).json({
+    message: error.message,
+  });
+}
 };
 
 // receives the worker registration request and passes the request data to the...

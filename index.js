@@ -6,13 +6,10 @@ import cors from "cors";
 import shiftRoutes from "./routes/shiftRoutes.js";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
-<<<<<<< HEAD
-import shiftAssignmentRoutes from "./routes/shiftAssignmentRoutes.js";
+import shiftAssignmentRoutes from "./routes/shiftAsignmentRoutes.js";
+import applicationRoutes from "./routes/applicationRoutes.js";  
 
 
-=======
-import applicationRoutes from "./routes/applicationRoutes.js";
->>>>>>> origin/facility-branch
 connectDB();
 
 const PORT = process.env.PORT || 8089;
