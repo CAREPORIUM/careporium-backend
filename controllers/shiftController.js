@@ -1,8 +1,12 @@
-import { createShift, getShifts, getShiftById ,updateShift,deleteShift} from "../services/shiftService.js";
+import shiftService from "../services/shiftService.js";
 
-const createShiftController = async (req, res) => {
+// create shift
+const createShift = async (req, res) => {
     try {
-        const shift = await createShift(req.user.id, req.body);
+
+        const shift = await shiftService.createShift(
+            req.user.id, 
+            req.body);
 
         res.status(201).json({
             message: "Shift created successfully",
@@ -15,9 +19,10 @@ const createShiftController = async (req, res) => {
     }
 };
 
-const getShiftsController = async (req, res) => {
+// get all available shifts
+const getAllShifts = async (req, res) => {
     try {
-        const shifts = await getShifts();
+        const shifts = await shiftService.getAllShifts();
 
         res.status(200).json({
             message: "Shifts fetched successfully",
@@ -30,23 +35,52 @@ const getShiftsController = async (req, res) => {
     }
 };
 
-const getShiftByIdController = async (req, res) => {
+//get shift by Id
+const getShiftById = async (req, res) => {
     try {
-        const shift = await getShiftById(req.params.id);
+
+        const { shiftId } = req.params;
+
+        const shift = await shiftService.getShiftById(
+            req.user.id,
+            req.user.role,
+            shiftId
+        );
 
         res.status(200).json({
             message: "Shift fetched successfully",
             data: shift
         });
+
     } catch (error) {
-        res.status(404).json({
+        res.status(400).json({
             message: error.message
         });
     }
 };
-const updateShiftController = async (req, res) => {
+
+// get all shifts belonging to a facility
+const getShiftsForFacility = async(req, res) =>{
+    try{ 
+        const userId = req.user.id
+        const shifts = await shiftService.getShiftsForFacility(userId)
+        res.status(200).json({
+            message: "Facility shifts retrieved successfully",
+            data: shifts
+        })
+    }catch(error){
+        res.status(400).json({
+            error:error.message
+        })
+    }
+}
+
+// facility updates shift
+const updateShift = async (req, res) => {
     try {
-        const shift = await updateShift(
+        const userId = req.user.id
+        const { shiftId } = req.params
+        const shift = await shiftService.updateShift(
             req.user.id,
             req.params.id,
             req.body
@@ -61,8 +95,56 @@ const updateShiftController = async (req, res) => {
             message: error.message
         });
     }
+}
+
+// close a shift
+const closeShift = async(req, res) => {
+    try{
+        const userId = req.user.id
+        const {shiftId} = req.params
+        const shift = await shiftService.closeShift(
+            userId,
+            shiftId
+        )
+
+        res.status(200).json({
+            message: "Shift closed successfully",
+            data: shift
+        })
+    }catch(error){
+        res.status(400).json({
+            error: error.message
+        })
+    }
+}
+
+// handles request to complete a shift
+const completeShift = async (req, res) => {
+    try {
+
+        const { shiftId } = req.params;
+
+        const shift = await shiftService.completeShift(
+            req.user.id,
+            shiftId
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Shift completed successfully.",
+            data: shift
+        });
+
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
 };
-const deleteShiftController = async (req, res) => {
+
+// deletes shift
+const deleteShift = async (req, res) => {
     try {
         await deleteShift(
             req.user.id,
@@ -78,4 +160,4 @@ const deleteShiftController = async (req, res) => {
         });
     }
 };
-export { createShiftController, getShiftsController, getShiftByIdController, updateShiftController, deleteShiftController };
+export default { createShift, getAllShifts, getShiftById, getShiftsForFacility, updateShift, closeShift, completeShift, deleteShift };

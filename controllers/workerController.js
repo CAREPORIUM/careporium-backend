@@ -42,5 +42,6 @@ const updateProfile = async (req, res) => {
     });
   }
 };
+}
 
 export { getWProfile, updateWProfile };

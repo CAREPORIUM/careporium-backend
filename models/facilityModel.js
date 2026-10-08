@@ -60,11 +60,17 @@ const facilitySchema = new mongoose.Schema(
       verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
       verificationComment: { type: String, default: "" }, verifiedAt: { type: Date }},
     verificationStatus: {
-    type: String,
-    enum: ["pending", "verified", "rejected"],
-    default: "pending"
+      type: String,
+      enum: ["pending", "verified"],
+      default: "pending"
     },
-
+    verificationComment: {
+      type: String,
+      default: ""
+    },
+    verfiedAt: {
+      type: Date
+    },
     secondaryContact: { fullName: { type: String, default: ""}, position: { type: String, default: "" }, 
     email: { type: String, default: "" }, phoneNumber: { type: String, default: "" } }
   }, { timestamps: true },

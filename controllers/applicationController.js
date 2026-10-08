@@ -1,5 +1,6 @@
 import applicationService from "../services/applicationService.js";
 
+// worker applies for a shift
 const applyForShift = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -13,8 +14,9 @@ const applyForShift = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+
 //worker views all their applications
-const getMyApplications = async (req, res) => {
+const getApplicationsForWorker = async (req, res) => {
   try {
     const userId = req.user.id;
     const applications =
@@ -27,6 +29,7 @@ const getMyApplications = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+
 //get all applicants and applications for a facility
 const getApplicationsForFacility = async (req, res) => {
   try {
@@ -41,6 +44,7 @@ const getApplicationsForFacility = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+
 //update application status for a facility
 const updateApplicationStatus = async (req, res) => {
   try {
@@ -62,7 +66,7 @@ const updateApplicationStatus = async (req, res) => {
 };
 export default {
   applyForShift,
-  getMyApplications,
+  getApplicationsForWorker,
   getApplicationsForFacility,
   updateApplicationStatus,
 };

@@ -25,6 +25,7 @@
     "multer": "^2.4.0",
     "node": "^22.23.3",
     "nodemailer": "^10.0.12",
+    "qrcode": "^1.5.4",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
   },

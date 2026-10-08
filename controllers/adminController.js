@@ -1,5 +1,4 @@
-import { getAllWorkers, getWorkerById, updateWorkerDocumentStatus,
-         getAllFacilities, getFacilityById, updateFacilityDocumentStatus } from '../services/adminService.js';
+import adminService from '../services/adminService.js';
 
 // handles request to retrieve all workers
 const getWorkers = async (req, res) => {
@@ -72,6 +71,23 @@ const getFacilities = async (req, res) => {
     }
 };
 
+// handles request to retrieve all pending facilities
+const getPendingFacilities = async (req, res) => {
+    try {
+        const facilities = await getPendingFacilities();
+
+        res.status(200).json({
+            success: true,
+            data: facilities
+        })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        })
+    }
+};
+
 // handles request to retrieve one facility
 const getOneFacility = async (req, res) => {
     try {
@@ -113,4 +129,28 @@ const updateFacilityDocStatus = async (req, res) => {
     }
 }
 
-export { getWorkers, getOneWorker, updateWorkerDocStatus , getFacilities, getOneFacility, updateFacilityDocStatus };
+// handles request to verify or reject an entire facility
+const updateFacilityStatus = async (req, res) => {
+    try {
+        const { status, comment } = req.body;
+
+        const facility = await updateFacilityVerificationStatus(
+            req.params.facilityId,
+            status,
+            comment
+        )
+
+        res.status(200).json({
+            success: true,
+            message: `Facility ${status} successfully`,
+            data: facility
+        })
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message
+        })
+    }
+};
+
+export default { getWorkers, getOneWorker, updateWorkerDocStatus , getFacilities, getPendingFacilities, getOneFacility, updateFacilityDocStatus, updateFacilityStatus };

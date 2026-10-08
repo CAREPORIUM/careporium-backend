@@ -12,6 +12,7 @@ import authRoutes from "./routes/authRoutes.js";
 import applicationRoutes from "./routes/applicationRoutes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./config/swagger.js";
+import attendanceRoutes from "./routes/attendanceRoutes.js";
 
 connectDB();
 
@@ -48,6 +49,10 @@ app.use("/api/worker/v1", workerRoutes);
 app.use("/api/facility/v1", facilityRoutes);
 app.use("/api/shifts/v1", shiftRoutes);
 app.use("/api/applications/v1", applicationRoutes);
+app.use("/api/admin/v1", adminRoutes);
+app.use("/api/attendance/v1", attendanceRoutes);
+
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

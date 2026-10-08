@@ -1,3 +1,4 @@
+import { truncate } from "fs/promises";
 import mongoose from "mongoose";
 
 const shiftSchema = new mongoose.Schema(
@@ -8,7 +9,7 @@ const shiftSchema = new mongoose.Schema(
             required: true
         },
 
-        role: {
+        profession: {
             type: String,
             required: true,
             trim: true
@@ -19,26 +20,16 @@ const shiftSchema = new mongoose.Schema(
             trim: true
         },
 
-        workType: {
+        shiftDate: {
             type: String,
             required: true,
-            trim: true
-        },
+            trim:true
+        },    
 
-        description: {
+        shiftType: {
             type: String,
             required: true,
-            trim: true
-        },
-
-        requirements: {
-            type: String,
-            trim: true
-        },
-
-        date: {
-            type: Date,
-            required: true
+            trim:true
         },
 
         startTime: {
@@ -53,30 +44,37 @@ const shiftSchema = new mongoose.Schema(
             trim: true
         },
 
-        shiftType: {
+        professionalsNeeded: {
+            type: Number,
+            required: true,
+            min: 1
+        },
+
+        minimumExperience: {
             type: String,
             required: true,
-            trim:true
+            trim: true
         },
 
         location: {
-            address: {
-                type: String,
-                required: true,
-                trim: true
-            },
+            type: String,
+            required: true,
+            trim: true
+        },
 
-            city: {
-                type: String,
-                required: true,
-                trim: true
-            },
+        responsibilities: {
+            type: String,
+            trim: true
+        },
 
-            state: {
-                type: String,
-                required: true,
-                trim: true
-            }
+        reqCredentials:{
+            type: String,
+            trim: true
+        },
+
+        arrivalInstructions:{
+            type: String,
+            trim: true
         },
 
         payRate: {
@@ -85,16 +83,27 @@ const shiftSchema = new mongoose.Schema(
             min: 0
         },
 
-        status: {
-            type: String,
-            enum: ["open", "filled", "closed"],
-            default: "open"
-        },
-
         isUrgent: {
             type: Boolean,
             default: false
-        }
+        },
+
+        status: {
+            type: String,
+            enum: ["open", "filled", "closed", "completed"],
+            default: "open"
+        },
+
+        attendanceQrToken: {
+            type: String,
+            unique: true,
+            sparse: true // allows shifts to have no token without conflicting with 'unique' property
+        },
+
+        assignedWorkers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Worker"
+        }]
     },
     {
         timestamps: true
