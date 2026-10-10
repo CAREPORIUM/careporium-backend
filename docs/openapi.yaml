@@ -7,9 +7,11 @@ info:
     This specification is based on the endpoints and request fields discussed so far.
     Confirm each path and HTTP method against the project's route files before treating it
     as an exact representation of the running server.
+
 servers:
   - url: http://localhost:8089
     description: Local development server
+
 tags:
   - name: Authentication
   - name: Worker Profiles
@@ -18,8 +20,10 @@ tags:
   - name: Shift Applications
   - name: Attendance
   - name: Admin
+
 security:
   - bearerAuth: []
+
 paths:
   /api/auth/v1/register/worker:
     post:
@@ -59,6 +63,7 @@ paths:
                 $ref: '#/components/schemas/RegistrationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/register/facility:
     post:
       tags: [Authentication]
@@ -98,6 +103,7 @@ paths:
                 $ref: '#/components/schemas/RegistrationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/verify-account:
     post:
       tags: [Authentication]
@@ -122,6 +128,7 @@ paths:
                 $ref: '#/components/schemas/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/resend-otp:
     post:
       tags: [Authentication]
@@ -141,6 +148,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/login:
     post:
       tags: [Authentication]
@@ -169,6 +177,7 @@ paths:
                   token: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/logout:
     post:
       tags: [Authentication]
@@ -178,6 +187,7 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /api/auth/v1/get-profile:
     get:
       tags: [Authentication]
@@ -187,24 +197,7 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
-  /api/auth/v1/update-profile:
-    put:
-      tags: [Authentication]
-      summary: Update the authenticated user's base profile
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                email: { type: string, format: email }
-                phoneNumber: { type: string }
-      responses:
-        '200':
-          $ref: '#/components/responses/Success'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/delete-profile/{userId}:
     delete:
       tags: [Authentication]
@@ -216,6 +209,7 @@ paths:
           $ref: '#/components/responses/Success'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /api/auth/v1/forgot-password:
     post:
       tags: [Authentication]
@@ -235,6 +229,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/reset-password:
     post:
       tags: [Authentication]
@@ -268,6 +263,7 @@ paths:
           $ref: '#/components/responses/Success'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /api/worker/v1/update-worker-profile/{userId}:
     put:
       tags: [Worker Profiles]
@@ -309,6 +305,7 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /api/facility/v1/update-facility-profile:
     put:
       tags: [Facility Profiles]
@@ -347,6 +344,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/shifts/v1/get-shifts:
     get:
       tags: [Shifts]
@@ -364,6 +362,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/shifts/v1/get-single-shift/{shiftId}:
     get:
       tags: [Shifts]
@@ -375,6 +374,7 @@ paths:
           $ref: '#/components/responses/Success'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /api/shifts/v1/get-facility-shifts:
     get:
       tags: [Shifts]
@@ -382,6 +382,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/shifts/v1/update-shift/{shiftId}:
     put:
       tags: [Shifts]
@@ -399,6 +400,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/shifts/v1/close-shift/{shiftId}:
     patch:
       tags: [Shifts]
@@ -408,6 +410,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/shifts/v1/complete-shift/{shiftId}:
     patch:
       tags: [Shifts]
@@ -417,6 +420,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/shifts/v1/delete-shift/{shiftId}:
     delete:
       tags: [Shifts]
@@ -440,6 +444,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/applications/v1/my-applications:
     get:
       tags: [Shift Applications]
@@ -447,6 +452,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/applications/v1/facility-applications:
     get:
       tags: [Shift Applications]
@@ -454,24 +460,44 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
-  /api/applications/v1/accept/{applicationId}:
+
+  /api/applications/v1/update-application/{applicationId}:
     patch:
       tags: [Shift Applications]
-      summary: Accept a shift application
+      summary: Update an application status
+      description: Allows an authorized facility to update the status of an application. Confirm the permitted statuses and authorization rules against the application service.
       parameters:
         - $ref: '#/components/parameters/ApplicationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateApplicationRequest'
+            examples:
+              acceptApplication:
+                summary: Accept an application
+                value:
+                  status: accepted
+              rejectApplication:
+                summary: Reject an application
+                value:
+                  status: rejected
       responses:
         '200':
-          $ref: '#/components/responses/Success'
-  /api/applications/v1/reject/{applicationId}:
-    patch:
-      tags: [Shift Applications]
-      summary: Reject a shift application
-      parameters:
-        - $ref: '#/components/parameters/ApplicationId'
-      responses:
-        '200':
-          $ref: '#/components/responses/Success'
+          description: Application updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /api/attendance/v1/qr/{shiftId}:
     get:
@@ -482,6 +508,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/attendance/v1/clock-in:
     post:
       tags: [Attendance]
@@ -500,6 +527,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/attendance/v1/clock-out:
     post:
       tags: [Attendance]
@@ -523,11 +551,31 @@ paths:
     get:
       tags: [Admin]
       summary: Retrieve all workers
+      description: Admin access required. Returns worker profiles with populated user details excluding password and OTP fields.
       responses:
         '200':
           $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/admin/v1/workers/pending:
+    get:
+      tags: [Admin]
+      summary: Retrieve workers with pending overall verification status
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
   /api/admin/v1/workers/{workerId}:
     get:
       tags: [Admin]
@@ -537,12 +585,18 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /api/admin/v1/workers/{workerId}/documents:
     patch:
       tags: [Admin]
       summary: Verify or reject a worker document
+      description: Rejecting a document requires a non-empty comment. The worker verification status is recalculated from all four required documents.
       parameters:
         - $ref: '#/components/parameters/WorkerId'
       requestBody:
@@ -550,28 +604,62 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DocumentReviewInput'
+              $ref: '#/components/schemas/WorkerDocumentReviewInput'
+            examples:
+              verifyDocument:
+                summary: Verify a professional license
+                value:
+                  documentType: professionalLicense
+                  status: verified
+              rejectDocument:
+                summary: Reject an identity document
+                value:
+                  documentType: idDocument
+                  status: rejected
+                  comment: The uploaded document is unclear.
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Document review saved and worker verification status recalculated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/admin/v1/facilities:
     get:
       tags: [Admin]
       summary: Retrieve all facilities
+      description: Admin access required. Returns facility profiles with populated user details excluding password and OTP fields.
       responses:
         '200':
           $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-  /api/admin/v1/pending-facilities:
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/admin/v1/facilities/pending:
     get:
       tags: [Admin]
-      summary: Retrieve pending facilities
+      summary: Retrieve facilities with pending overall verification status
       responses:
         '200':
           $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
   /api/admin/v1/facilities/{facilityId}:
     get:
       tags: [Admin]
@@ -581,12 +669,18 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /api/admin/v1/facilities/{facilityId}/documents:
     patch:
       tags: [Admin]
-      summary: Verify or reject one facility document
+      summary: Verify or reject a facility document
+      description: Rejecting a document requires a non-empty comment. Facility verification status is recalculated from all three required documents.
       parameters:
         - $ref: '#/components/parameters/FacilityId'
       requestBody:
@@ -594,23 +688,38 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DocumentReviewInput'
+              $ref: '#/components/schemas/FacilityDocumentReviewInput'
+            examples:
+              verifyDocument:
+                summary: Verify a business registration certificate
+                value:
+                  documentType: businessRegCert
+                  status: verified
+              rejectDocument:
+                summary: Reject a tax identification document
+                value:
+                  documentType: taxID
+                  status: rejected
+                  comment: The uploaded tax document is invalid.
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Document review saved and facility verification status recalculated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-  /api/admin/v1/pending-workers:
-    get:
-      tags: [Admin]
-      summary: Retrieve pending workers
-      responses:
-        '200':
-          $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /api/admin/v1/verification-queue:
     get:
       tags: [Admin]
-      summary: Retrieve all individual worker and facility documents pending verification
+      summary: Retrieve individual worker and facility documents awaiting verification
+      description: Returns one queue item per uploaded document whose document verificationStatus is pending, sorted newest profile submission first.
       responses:
         '200':
           description: Combined verification queue
@@ -619,18 +728,52 @@ paths:
               schema:
                 type: object
                 properties:
-                  success: { type: boolean, example: true }
+                  success:
+                    type: boolean
+                    example: true
                   data:
                     type: array
                     items:
                       $ref: '#/components/schemas/VerificationQueueItem'
-  /api/admin/v1/dashboard-stats:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/admin/v1/dashboard/stats:
     get:
       tags: [Admin]
       summary: Retrieve admin dashboard statistics
+      description: Returns counts of workers, verified workers, facilities, verified facilities, pending individual document reviews, active shifts (open or filled), and completed shifts.
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      totalWorkers: { type: integer, example: 120 }
+                      verifiedWorkers: { type: integer, example: 78 }
+                      totalFacilities: { type: integer, example: 25 }
+                      verifiedFacilities: { type: integer, example: 18 }
+                      pendingVerifications: { type: integer, example: 14 }
+                      activeShifts: { type: integer, example: 9 }
+                      completedShifts: { type: integer, example: 43 }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
 
 components:
   securitySchemes:
@@ -638,6 +781,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
   parameters:
     UserId:
       in: path
@@ -664,6 +808,7 @@ components:
       name: applicationId
       required: true
       schema: { type: string }
+
   schemas:
     RegistrationResponse:
       type: object
@@ -675,6 +820,7 @@ components:
             userId: { type: string }
             workerId: { type: string }
             facilityId: { type: string }
+
     UserSummary:
       type: object
       properties:
@@ -682,6 +828,7 @@ components:
         email: { type: string, format: email }
         role: { type: string, enum: [worker, facility, admin] }
         isVerified: { type: boolean }
+
     Location:
       type: object
       properties:
@@ -690,6 +837,7 @@ components:
         city: { type: string }
         state: { type: string }
         country: { type: string }
+
     SecondaryContact:
       type: object
       properties:
@@ -697,6 +845,7 @@ components:
         position: { type: string }
         email: { type: string, format: email }
         phoneNumber: { type: string }
+
     ShiftInput:
       type: object
       required: [role, date, startTime, endTime]
@@ -717,13 +866,41 @@ components:
         shiftType: { type: string }
         location:
           $ref: '#/components/schemas/Location'
-    DocumentReviewInput:
+
+    UpdateApplicationRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted, rejected]
+          description: Application decision. Confirm exact accepted values against the application service.
+          example: accepted
+
+    WorkerDocumentReviewInput:
       type: object
       required: [documentType, status]
       properties:
         documentType:
           type: string
-          enum: [professionalLicense, idDocument, educationCert, proofOfLocation, businessRegCert, facilityLicense, taxID]
+          enum: [professionalLicense, idDocument, educationCert, proofOfLocation]
+          example: professionalLicense
+        status:
+          type: string
+          enum: [verified, rejected]
+          example: verified
+        comment:
+          type: string
+          description: Required when status is rejected.
+          example: The uploaded document is unclear.
+
+    FacilityDocumentReviewInput:
+      type: object
+      required: [documentType, status]
+      properties:
+        documentType:
+          type: string
+          enum: [businessRegCert, facilityLicense, taxID]
           example: businessRegCert
         status:
           type: string
@@ -731,7 +908,9 @@ components:
           example: verified
         comment:
           type: string
-          example: Document reviewed and approved.
+          description: Required when status is rejected.
+          example: The uploaded document is invalid.
+
     VerificationQueueItem:
       type: object
       properties:
@@ -743,17 +922,20 @@ components:
         documentVerificationStatus: { type: string, enum: [pending] }
         verificationComment: { type: string }
         submittedAt: { type: string, format: date-time }
+
     SuccessResponse:
       type: object
       properties:
         success: { type: boolean, example: true }
         message: { type: string }
         data: {}
+
     ErrorResponse:
       type: object
       properties:
         success: { type: boolean, example: false }
         message: { type: string, example: Something went wrong }
+
   responses:
     Success:
       description: Request completed successfully
@@ -761,26 +943,37 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/SuccessResponse'
+
     BadRequest:
       description: Invalid input or request could not be completed
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+
     Unauthorized:
       description: Authentication required or token invalid
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+
     Forbidden:
       description: User is not permitted to perform this action
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+
     NotFound:
       description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ServerError:
+      description: Unexpected server error
       content:
         application/json:
           schema:

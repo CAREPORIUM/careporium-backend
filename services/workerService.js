@@ -28,21 +28,19 @@ const updateWorkerProfile = async (userId, updateData, files) => {
         'about'
     ];
 
-  // create an empty object to store the fields...
-  // ...that the user is allowed to update
-  const filteredData = {};
+    // create an empty object to store the fields...
+    // ...that the user is allowed to update
+    const filteredData = {};
 
-  // go through each allowed field
-  for (const field of allowedFields) {
-    // check if the user actually provided this field
-    if (updateData[field] !== undefined) {
-      // add the field and its value to filteredData
-      filteredData[field] = updateData[field];
+    // go through each allowed field
+    for (const field of allowedFields) {
+        // check if the user actually provided this field
+        if (updateData[field] !== undefined) {
+            filteredData[field] = updateData[field];
+        }
     }
-  }
 
-   // check if any location information was provided
-        // check if any location information was provided
+    // check if any location information was provided
     if (updateData.locationAddress !== undefined) {
         filteredData['location.address'] = updateData.locationAddress;
     }
@@ -115,11 +113,13 @@ const updateWorkerProfile = async (userId, updateData, files) => {
         worker.certifications.professionalLicense.verificationStatus =
             'pending';
 
+        // clear the previous rejection comment
+        worker.certifications.professionalLicense.verificationComment = '';
+
         // remove the previous verification date
         worker.certifications.professionalLicense.verifiedAt =
             undefined;
     }
-
 
     // check if an ID document was uploaded
     if (files?.idDocument?.[0]) {
@@ -141,11 +141,13 @@ const updateWorkerProfile = async (userId, updateData, files) => {
         worker.certifications.idDocument.verificationStatus =
             'pending';
 
+        // clear the previous rejection comment
+        worker.certifications.idDocument.verificationComment = '';
+
         // remove the previous verification date
         worker.certifications.idDocument.verifiedAt =
             undefined;
     }
-
 
     // check if an education certificate was uploaded
     if (files?.educationCert?.[0]) {
@@ -167,11 +169,13 @@ const updateWorkerProfile = async (userId, updateData, files) => {
         worker.certifications.educationCert.verificationStatus =
             'pending';
 
+        // clear the previous rejection comment
+        worker.certifications.educationCert.verificationComment = '';
+
         // remove the previous verification date
         worker.certifications.educationCert.verifiedAt =
             undefined;
     }
-
 
     // check if proof of location was uploaded
     if (files?.proofOfLocation?.[0]) {
@@ -193,12 +197,15 @@ const updateWorkerProfile = async (userId, updateData, files) => {
         worker.proofOfLocation.verificationStatus =
             'pending';
 
+        // clear the previous rejection comment
+        worker.proofOfLocation.verificationComment = '';
+
         // remove the previous verification date
         worker.proofOfLocation.verifiedAt =
             undefined;
     }
 
-        // check if any verification document was replaced
+    // check if any verification document was replaced
     const documentReplaced =
         files?.professionalLicense?.[0] ||
         files?.idDocument?.[0] ||
@@ -207,14 +214,12 @@ const updateWorkerProfile = async (userId, updateData, files) => {
 
     // reset overall verification when a document is replaced
     if (documentReplaced) {
-        worker.overallVerificationStatus = 'pending';
+        worker.verificationStatus = 'pending';
         worker.verifiedAt = undefined;
     }
 
-
     // save the updated worker profile
     await worker.save();
-
 
     // get the updated worker profile and populate the user information
     const updatedWorker = await Worker.findById(

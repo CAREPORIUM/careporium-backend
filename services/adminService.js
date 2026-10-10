@@ -323,7 +323,7 @@ const getVerificationQueue = async () => {
                     documentType,
                     documentUrl: document.url,
                     documentVerificationStatus: document.verificationStatus,
-                    verificationComment: document.verificationComment,
+                    //verificationComment: document.verificationComment,
                     submittedAt: worker.createdAt
                 });
 
@@ -365,7 +365,7 @@ const getVerificationQueue = async () => {
                     documentType,
                     documentUrl: document.url,
                     documentVerificationStatus: document.verificationStatus,
-                    verificationComment: document.verificationComment,
+                    //verificationComment: document.verificationComment,
                     submittedAt: facility.createdAt
                 });
 
