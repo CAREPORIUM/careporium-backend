@@ -7,9 +7,11 @@ info:
     This specification is based on the endpoints and request fields discussed so far.
     Confirm each path and HTTP method against the project's route files before treating it
     as an exact representation of the running server.
-
-servers:
-  - url: https://careporium-backend.onrender.com/api-docs/
+    
+ servers:
+  - url: https://careporium-backend.onrender.com
+    description: Production server
+  - url: https://localhost:8089
     description: Local development server
 
 tags:
