@@ -1,26 +1,12 @@
-import swaggerJsdoc from "swagger-jsdoc";
 
-const options = {
-    definition: {
-        openapi: "3.0.0",
+import fs from "fs";
+import YAML from "yaml";
 
-        info: {
-            title: "Careporium API",
-            version: "1.0.0",
-            description:
-                "API documentation for the Careporium Healthcare Worker Shift Marketplace"
-        },
+const swaggerFile = fs.readFileSync(
+    new URL("../docs/openapi.yaml", import.meta.url),
+    "utf8"
+);
 
-        servers: [
-            {
-                url: "http://localhost:8089"
-            }
-        ]
-    },
-
-    apis: ["./routes/*.js"]
-};
-
-const swaggerSpec = swaggerJsdoc(options);
+const swaggerSpec = YAML.parse(swaggerFile);
 
 export default swaggerSpec;

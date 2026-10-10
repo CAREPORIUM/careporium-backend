@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { randomInt, createHash } from "crypto"
 import mongoose from "mongoose";
 import User from "../models/userModel.js";
 import Worker from "../models/workerModel.js";
@@ -25,6 +26,12 @@ const registerWorker = async (workerData) => {
 
     if (existingUser) {
         throw new Error('Email already exists!');
+    }
+
+    if (password.length < 8) {
+      throw new Error(
+        'Password must be at least 8 characters long'
+      )
     }
 
     const genSalt = await bcrypt.genSalt(10);
@@ -124,12 +131,18 @@ const registerFacility = async (req) => {
     // check required documents
     if (
         !req.files ||
-        !req.files.businessRegCert ||
-        !req.files.facilityLicense ||
-        !req.files.taxID
+        !req.files.businessRegCert?.[0] ||
+        !req.files.facilityLicense?.[0] ||
+        !req.files.taxID?.[0]
     ) {
         throw new Error(
             'Business registration certificate, facility license and Tax ID are required.'
+        );
+    }
+
+    if (!password || password.length < 8) {
+        throw new Error(
+            'Password must be at least 8 characters long'
         );
     }
 
@@ -137,7 +150,13 @@ const registerFacility = async (req) => {
     const genSalt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, genSalt);
 
-    // upload business registration certificate
+    // generate a secure 6-digit OTP
+    const otp = randomInt(100000, 1000000).toString();
+
+    // OTP expires in 5 minutes
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
+
+    // upload facility documents
     let businessRegCertUpload;
     let facilityLicenseUpload;
     let taxIDUpload;
@@ -147,151 +166,161 @@ const registerFacility = async (req) => {
             req.files.businessRegCert[0].path
         );
 
-        // upload facility license
         facilityLicenseUpload = await cloudinary.uploader.upload(
             req.files.facilityLicense[0].path
         );
 
-        // upload Tax ID
         taxIDUpload = await cloudinary.uploader.upload(
             req.files.taxID[0].path
         );
 
-        const businessRegCert_URL = businessRegCertUpload.secure_url;
-        const facilityLicense_URL = facilityLicenseUpload.secure_url;
-        const taxID_URL = taxIDUpload.secure_url;
-
-        const session = await mongoose.startSession();
-
-        // start a MongoDB session and transaction to ensure the User and Facility records are created together
-        // if either operation fails, the transaction can be rolled back to prevent a partial facility registration
+    } catch (error) {
+        // clean up Cloudinary uploads if any upload fails
         try {
-            session.startTransaction();
-
-            // create facility user account
-            const users = await User.create(
-                [{
-                    email,
-                    phoneNumber,
-                    password: hashedPassword,
-                    role: 'facility',
-                    isVerified: false
-                }],
-                { session }
-            );
-
-            const user = users[0];
-
-            // Generate OTP
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-            // OTP expires in 5 minutes
-            const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
-
-            // Save OTP
-            user.verificationOtp = otp;
-            user.verificationOtpExpires = otpExpires;
-
-            await user.save({ session });
-
-            // Create facility profile
-            const facilities = await Facility.create(
-                [{
-                    user: user._id,
-                    facilityName,
-                    facilityType,
-                    location: {
-                        address: location.address,
-                        city: location.city,
-                        state: location.state,
-                        country: location.country
-                    },
-                    secondaryContact: {
-                        fullName: secondaryContact.fullName,
-                        position: secondaryContact.position,
-                        email: secondaryContact.email,
-                        phoneNumber: secondaryContact.phoneNumber
-                    },
-                    businessRegCert: {
-                        businessRegCert_URL
-                    },
-                    facilityLicense: {
-                        facilityLicense_URL
-                    },
-                    taxID: {
-                        taxID_URL
-                    }
-                }],
-                { session }
-            );
-
-            const facility = facilities[0];
-
-            await session.commitTransaction();
-            await session.endSession();
-
-            // send verification OTP
-            try {
-                await transporter.sendMail({
-                    from: `"Careporium" <${process.env.EMAIL_FROM}>`,
-                    to: user.email,
-                    subject: 'Verify your Careporium facility account',
-                    text: `Your Careporium facility verification code is ${otp}. It expires in 5 minutes.`
-                });
-            } catch (emailError) {
-                console.error(
-                    'Verification email could not be sent:',
-                    emailError
-                );
-
-                throw new Error(
-                    'Facility account was created, but the verification email could not be sent.'
+            if (businessRegCertUpload?.public_id) {
+                await cloudinary.uploader.destroy(
+                    businessRegCertUpload.public_id
                 );
             }
 
-            return {
-                userId: user._id,
-                facilityId: facility._id
-            };
-
-        } catch (error) {
-            await session.abortTransaction();
-            await session.endSession();
-
-            // clean up Cloudinary uploads if database creation fails
-            try {
-                if (businessRegCertUpload?.public_id) {
-                    await cloudinary.uploader.destroy(
-                        businessRegCertUpload.public_id
-                    );
-                }
-
-                if (facilityLicenseUpload?.public_id) {
-                    await cloudinary.uploader.destroy(
-                        facilityLicenseUpload.public_id
-                    );
-                }
-
-                if (taxIDUpload?.public_id) {
-                    await cloudinary.uploader.destroy(
-                        taxIDUpload.public_id
-                    );
-                }
-            } catch (cloudinaryError) {
-                console.error(
-                    'Cloudinary cleanup failed:',
-                    cloudinaryError
+            if (facilityLicenseUpload?.public_id) {
+                await cloudinary.uploader.destroy(
+                    facilityLicenseUpload.public_id
                 );
             }
 
-            throw error;
+            if (taxIDUpload?.public_id) {
+                await cloudinary.uploader.destroy(
+                    taxIDUpload.public_id
+                );
+            }
+        } catch (cloudinaryError) {
+            console.error(
+                'Cloudinary cleanup failed:',
+                cloudinaryError
+            );
         }
 
-    } catch (error) {
         throw error;
     }
-};
 
+    let user;
+    let facility;
+    const session = await mongoose.startSession();
+
+    try {
+        session.startTransaction();
+
+        // create facility user account
+        const users = await User.create(
+            [{
+                email,
+                phoneNumber,
+                password: hashedPassword,
+                role: 'facility',
+                isVerified: false,
+                verificationOtp: otp,
+                verificationOtpExpires: otpExpires
+            }],
+            { session }
+        );
+
+        user = users[0];
+
+        // create facility profile
+        const facilities = await Facility.create(
+            [{
+                user: user._id,
+                facilityName,
+                facilityType,
+                location: {
+                    address: location.address,
+                    city: location.city,
+                    state: location.state,
+                    country: location.country
+                },
+                secondaryContact: {
+                    fullName: secondaryContact.fullName,
+                    position: secondaryContact.position,
+                    email: secondaryContact.email,
+                    phoneNumber: secondaryContact.phoneNumber
+                },
+                businessRegCert: {
+                    url: businessRegCertUpload.secure_url
+                },
+                facilityLicense: {
+                    url: facilityLicenseUpload.secure_url
+                },
+                taxID: {
+                    url: taxIDUpload.secure_url
+                }
+            }],
+            { session }
+        );
+
+        facility = facilities[0];
+
+        await session.commitTransaction();
+
+    } catch (error) {
+        await session.abortTransaction();
+
+        // clean up Cloudinary uploads if database creation fails
+        try {
+            if (businessRegCertUpload?.public_id) {
+                await cloudinary.uploader.destroy(
+                    businessRegCertUpload.public_id
+                );
+            }
+
+            if (facilityLicenseUpload?.public_id) {
+                await cloudinary.uploader.destroy(
+                    facilityLicenseUpload.public_id
+                );
+            }
+
+            if (taxIDUpload?.public_id) {
+                await cloudinary.uploader.destroy(
+                    taxIDUpload.public_id
+                );
+            }
+        } catch (cloudinaryError) {
+            console.error(
+                'Cloudinary cleanup failed:',
+                cloudinaryError
+            );
+        }
+
+        throw error;
+
+    } finally {
+        await session.endSession();
+    }
+
+    // send verification OTP
+    try {
+        await transporter.sendMail({
+            from: `"Careporium" <${process.env.EMAIL_FROM}>`,
+            to: user.email,
+            subject: 'Verify your Careporium facility account',
+            text: `Your Careporium facility verification code is ${otp}. It expires in 5 minutes.`
+        });
+    } catch (emailError) {
+        console.error(
+            'Verification email could not be sent:',
+            emailError
+        );
+
+        throw new Error(
+            'Facility account was created, but the verification email could not be sent. Please request a new verification code.'
+        );
+    }
+
+    return {
+        userId: user._id,
+        facilityId: facility._id
+    };
+};
 
 // verify user account using OTP sent to user's email
 const verifyAccount = async (email, otp) => {
@@ -406,7 +435,8 @@ const loginUser = async (loginData) => {
     const token = jwt.sign(
         {
             id: user._id,
-            role: user.role
+            role: user.role,
+            tokenVersion: user.tokenVersion ?? 0
         },
         process.env.JWT_SECRET,
         {
@@ -422,9 +452,26 @@ const loginUser = async (loginData) => {
             isVerified: user.isVerified
         },
         token
-    };
-};
+    }
+}
 
+// log out user
+const logoutUser = async(userId) => {
+  const user = await User.findByIdAndUpdate(
+    userId, 
+    {
+      $inc: { tokenVersion: 1 }
+    },
+    { returnDocument: 'after' }
+  )
+  if (!user){
+    throw new Error('User not found')
+  }
+
+  return{
+    message: 'Logout successful'
+  }
+}
 
 // get user profile by user ID, excluding sensitive fields like password and OTP
 const getProfile = async (userId) => {
@@ -438,6 +485,117 @@ const getProfile = async (userId) => {
 
     return user;
 };
+
+// forgot password
+const forgotPassword = async(email) => {
+    const user = await User.findOne({
+      email: email.trim().toLowerCase()
+    })
+    // a generic response to prevent the service from
+    // revealing if an email address is registered or not
+    const response = {
+      message: 'If an account with the email exists, a password reset code has been sent'
+    }
+
+    if(!user) {
+      return response
+    }
+
+    // generate a secure 6-digit OTP
+    const otp = randomInt(100000, 1000000).toString()
+
+    // hash the OTP before saving it
+    user.resetPasswordOtp = createHash('sha256')
+        .update(otp)
+        .digest('hex');
+
+    // OTP expires in 10 minutes
+    user.resetPasswordOtpExpires = new Date(
+        Date.now() + 10 * 60 * 1000
+    )
+
+    await user.save()
+
+    // send password reset OTP
+    try{
+      await transporter.sendMail({
+        from: `"Careporium" <${process.env.EMAIL_FROM}>`,
+        to: user.email,
+        subject: 'Reset Your Careporium Account Password',
+        text: `Your Careporium password reset code is ${otp}. It expires in 10 minutes. If you did not request this, you can ignore this email.`
+      })
+    }catch (emailError) {
+
+      //console.error("Password reset email error:", emailError)
+      user.resetPasswordOtp = undefined
+      user.resetPasswordOtpExpires = undefined
+
+      await user.save()
+
+      throw new Error(
+        'Unable to send the password reset email. Please try again'
+      )
+    }
+    return response
+  }
+
+// reset password
+const resetPassword = async(email, otp, newPassword) => {
+    if (!email || !otp || !newPassword) {
+      throw new Error(
+        'Email, OTP and new password are required'
+      )
+    }
+    if (newPassword.length < 8) {
+      throw new Error(
+      'Password must be at least 8 characters long'
+      )
+    }
+
+    const user = await User.findOne({
+      email: email.trim().toLowerCase()
+    })
+
+    if (!user) {
+      throw new Error('Invalid or expired password reset code')
+    }
+
+    if(
+      !user.resetPasswordOtp ||
+      !user.resetPasswordOtpExpires
+    ){
+      throw new Error('Invalid or expired password reset code')
+    }
+
+    if (user.resetPasswordOtpExpires < new Date()) {
+      throw new Error('Password reset code has expired')
+    }
+
+    // hash the submitted OTP and compare it with the stored hash
+    const hashedOtp = createHash('sha256')
+      .update(otp)
+      .digest('hex')
+
+    if(hashedOtp !== user.resetPasswordOtp){
+      throw new Error('Invalid or expired password reset code')
+    }
+
+    // hash the new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt)
+
+    user.resetPasswordOtp = undefined
+    user.resetPasswordOtpExpires = undefined
+
+    //invalidate previously issued JWTs
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1
+
+    await user.save();
+
+    return {
+      message: 'Password reset successful. You may proceed to log in'
+    }
+  }
 
 
 // delete user account and associated worker or facility profile
@@ -474,6 +632,9 @@ export {
     verifyAccount,
     resendVerificationOtp,
     loginUser,
+    logoutUser,
     getProfile,
+    forgotPassword,
+    resetPassword,
     deleteUser
 };

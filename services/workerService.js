@@ -1,7 +1,5 @@
 import Worker from '../models/workerModel.js';
 import cloudinary from '../config/cloudinary.js';
-import User from '../models/userModel.js';
-import bcrypt from 'bcryptjs';
 
 // handles retrieval of worker's profile
 const getWorkerProfile = async (userId) => {
@@ -44,20 +42,21 @@ const updateWorkerProfile = async (userId, updateData, files) => {
   }
 
    // check if any location information was provided
-    if (
-        updateData.locationAddress !== undefined ||
-        updateData.locationStreet !== undefined ||
-        updateData.locationState !== undefined ||
-        updateData.locationCountry !== undefined
-    ) {
+        // check if any location information was provided
+    if (updateData.locationAddress !== undefined) {
+        filteredData['location.address'] = updateData.locationAddress;
+    }
 
-        // create the location object
-        filteredData.location = {
-            address: updateData.locationAddress,
-            street: updateData.locationStreet,
-            state: updateData.locationState,
-            country: updateData.locationCountry
-        };
+    if (updateData.locationStreet !== undefined) {
+        filteredData['location.street'] = updateData.locationStreet;
+    }
+
+    if (updateData.locationState !== undefined) {
+        filteredData['location.state'] = updateData.locationState;
+    }
+
+    if (updateData.locationCountry !== undefined) {
+        filteredData['location.country'] = updateData.locationCountry;
     }
 
     const worker = await Worker.findOne({
@@ -67,30 +66,6 @@ const updateWorkerProfile = async (userId, updateData, files) => {
     if (!worker) {
         throw new Error('Profile not found');
     }
-
-    // handle password change separately because
-    // the password belongs to the User model, not the Worker model
-if (updateData.password !== undefined) {
-    if (!updateData.password || updateData.password.trim() === '') {
-        throw new Error('Password cannot be empty');
-    }
-
-    // Hash the new password before saving it
-    const hashedPassword = await bcrypt.hash(updateData.password, 10);
-
-    // Find the user's account
-    const user = await User.findById(userId);
-
-    if (!user) {
-        throw new Error('User not found');
-    }
-
-    // Update the user's password
-    user.password = hashedPassword;
-
-    // Save the updated user
-    await user.save();
-}
 
     // update the worker's profile information
     Object.assign(worker, filteredData);
@@ -221,6 +196,19 @@ if (updateData.password !== undefined) {
         // remove the previous verification date
         worker.proofOfLocation.verifiedAt =
             undefined;
+    }
+
+        // check if any verification document was replaced
+    const documentReplaced =
+        files?.professionalLicense?.[0] ||
+        files?.idDocument?.[0] ||
+        files?.educationCert?.[0] ||
+        files?.proofOfLocation?.[0];
+
+    // reset overall verification when a document is replaced
+    if (documentReplaced) {
+        worker.overallVerificationStatus = 'pending';
+        worker.verifiedAt = undefined;
     }
 
 

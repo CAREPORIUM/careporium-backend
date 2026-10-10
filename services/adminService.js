@@ -1,43 +1,78 @@
+
 import Worker from '../models/workerModel.js';
 import Facility from '../models/facilityModel.js';
+import Shift from '../models/shiftModel.js'
 
-// handles retrieval of all workers
+
+// handles request to retrieve all workers
 const getAllWorkers = async () => {
-    const workers = await Worker.find()
-        .populate(
-            'user',
-            '-password -verificationOtp -verificationOtpExpires'
-        )
-        .sort({
-            createdAt: -1
-        });
-    return workers
+
+    const workers = await Worker.find().populate(
+        'user',
+        '-password -verificationOtp -verificationOtpExpires'
+    );
+
+    return workers;
 };
 
-// handles retrieval of one worker
+
+// handles request to retrieve one worker
 const getWorkerById = async (workerId) => {
-    const worker = await Worker.findById(workerId)
-        .populate(
-            'user',
-            '-password -verificationOtp -verificationOtpExpires'
-        );
+
+    const worker = await Worker.findById(workerId).populate(
+        'user',
+        '-password -verificationOtp -verificationOtpExpires'
+    );
 
     if (!worker) {
-        throw new Error('Worker not found')
+        throw new Error('Worker not found');
     }
 
-    return worker
+    return worker;
 };
 
-// handles verification or rejection of worker documents
+
+// updates the worker's verification status based on all required documents
+const updateWorkerVerificationStatus = (worker) => {
+
+    const requiredDocuments = [
+        worker.certifications?.professionalLicense,
+        worker.certifications?.idDocument,
+        worker.certifications?.educationCert,
+        worker.proofOfLocation
+    ];
+
+    const allDocumentsVerified = requiredDocuments.every(
+        document =>
+            document?.url &&
+            document.verificationStatus === 'verified'
+    );
+
+    if (allDocumentsVerified) {
+
+        if (worker.verificationStatus !== 'verified') {
+            worker.verifiedAt = new Date();
+        }
+
+        worker.verificationStatus = 'verified';
+
+    } else {
+
+        worker.verificationStatus = 'pending';
+        worker.verifiedAt = undefined;
+
+    }
+};
+
+
+// handles request to verify or reject a worker document
 const updateWorkerDocumentStatus = async (
     workerId,
     documentType,
     status,
-    comment
+    comment = ''
 ) => {
 
-    // documents that the admin is allowed to review
     const allowedDocuments = [
         'professionalLicense',
         'idDocument',
@@ -45,79 +80,48 @@ const updateWorkerDocumentStatus = async (
         'proofOfLocation'
     ];
 
-    // check if the document type is valid
     if (!allowedDocuments.includes(documentType)) {
-        throw new Error('Invalid document type');
+        throw new Error('Invalid worker document type');
     }
 
-    // admin can only verify or reject
-    const allowedStatuses = [
-        'verified',
-        'rejected'
-    ];
-
-    // check if the status is valid
-    if (!allowedStatuses.includes(status)) {
-        throw new Error('Invalid verification status')
+    if (!['verified', 'rejected'].includes(status)) {
+        throw new Error('Invalid document status');
     }
 
-    // if admin is rejecting the document,
-    // a comment must be provided
-    if (
-        status === 'rejected' &&
-        (!comment || comment.trim() === '')
-    ) {
-        throw new Error(
-            'A comment is required when rejecting a document'
-        );
+    if (status === 'rejected' && !comment.trim()) {
+        throw new Error('A comment is required when rejecting a document');
     }
 
-    // find the worker
-    const worker = await Worker.findById(workerId)
+    const worker = await Worker.findById(workerId);
 
     if (!worker) {
-        throw new Error('Worker not found')
+        throw new Error('Worker not found');
     }
 
-    let document;
+    // retrieves the selected document from the worker profile
+    const document =
+        documentType === 'proofOfLocation'
+            ? worker.proofOfLocation
+            : worker.certifications?.[documentType];
 
-    if (
-        documentType === 'professionalLicense' ||
-        documentType === 'idDocument' ||
-        documentType === 'educationCert'
-    ) {
-        document =
-            worker.certifications?.[documentType];
-    } else if (documentType === 'proofOfLocation') {
-        document = worker.proofOfLocation;
-    }
-
-    // make sure the document has been uploaded
     if (!document?.url) {
-        throw new Error('Document has not been uploaded')
+        throw new Error('Document has not been uploaded');
     }
 
+    // updates the document verification details
     document.verificationStatus = status;
+    document.verificationComment =
+        status === 'rejected' ? comment.trim() : '';
 
-    // save the admin's comment
-    if (status === 'rejected') {
+    document.verifiedAt =
+        status === 'verified' ? new Date() : undefined;
 
-        document.verificationComment =
-            comment.trim();
-    } else {
-        // clear any previous rejection comment
-        document.verificationComment = '';
-    }
-
-    // record when the document was reviewed
-    document.verifiedAt = new Date();
+    // updates the worker's verification status automatically
+    updateWorkerVerificationStatus(worker);
 
     await worker.save();
 
-    // return the updated worker
-    const updatedWorker = await Worker.findById(
-        worker._id
-    ).populate(
+    const updatedWorker = await worker.populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
     );
@@ -125,41 +129,40 @@ const updateWorkerDocumentStatus = async (
     return updatedWorker;
 };
 
-// handles retrieval of all facilities
+
+// handles request to retrieve all facilities
 const getAllFacilities = async () => {
-    const facilities = await Facility.find()
-        .populate(
-            'user',
-            '-password -verificationOtp -verificationOtpExpires'
-        )
-        .sort({
-            createdAt: -1
-        });
+
+    const facilities = await Facility.find().populate(
+        'user',
+        '-password -verificationOtp -verificationOtpExpires'
+    );
+
     return facilities;
 };
 
-// handles retrieval of pending facilities
-const getPendingFacilities = async() =>{
+
+// handles request to retrieve all pending facilities
+const getPendingFacilities = async () => {
+
     const facilities = await Facility.find({
         verificationStatus: 'pending'
-    })
-        .populate(
-            'user',
-            '-password -verificationOtp -verificationOtpExpires'
-        )
-        .sort({
-            createdAt: -1
-        })
-        return facilities
-}
+    }).populate(
+        'user',
+        '-password -verificationOtp -verificationOtpExpires'
+    );
 
-// handles retrieval of one facility
+    return facilities;
+};
+
+
+// handles request to retrieve one facility
 const getFacilityById = async (facilityId) => {
-    const facility = await Facility.findById(facilityId)
-        .populate(
-            'user',
-            '-password -verificationOtp -verificationOtpExpires'
-        );
+
+    const facility = await Facility.findById(facilityId).populate(
+        'user',
+        '-password -verificationOtp -verificationOtpExpires'
+    );
 
     if (!facility) {
         throw new Error('Facility not found');
@@ -168,87 +171,92 @@ const getFacilityById = async (facilityId) => {
     return facility;
 };
 
-// handles verification or rejection of facility documents
+
+// updates the facility's verification status based on all required documents
+const updateFacilityVerificationStatus = (facility) => {
+
+    const requiredDocuments = [
+        facility.businessRegCert,
+        facility.facilityLicense,
+        facility.taxID
+    ];
+
+    const allDocumentsVerified = requiredDocuments.every(
+        document =>
+            document?.url &&
+            document.verificationStatus === 'verified'
+    );
+
+    if (allDocumentsVerified) {
+
+        if (facility.verificationStatus !== 'verified') {
+            facility.verifiedAt = new Date();
+        }
+
+        facility.verificationStatus = 'verified';
+
+    } else {
+
+        facility.verificationStatus = 'pending';
+        facility.verifiedAt = undefined;
+
+    }
+};
+
+
+// handles request to verify or reject a facility document
 const updateFacilityDocumentStatus = async (
     facilityId,
     documentType,
     status,
-    comment
+    comment = ''
 ) => {
 
-    // documents that the admin is allowed to review
     const allowedDocuments = [
         'businessRegCert',
         'facilityLicense',
         'taxID'
     ];
 
-    // check if the document type is valid
     if (!allowedDocuments.includes(documentType)) {
-        throw new Error('Invalid document type');
+        throw new Error('Invalid facility document type');
     }
 
-    // admin can only verify or reject
-    const allowedStatuses = [
-        'verified',
-        'rejected'
-    ];
-
-    // check if the status is valid
-    if (!allowedStatuses.includes(status)) {
-        throw new Error('Invalid verification status');
+    if (!['verified', 'rejected'].includes(status)) {
+        throw new Error('Invalid document status');
     }
 
-    // if admin is rejecting the document,
-    // a comment must be provided
-    if (
-        status === 'rejected' &&
-        (!comment || comment.trim() === '')
-    ) {
-        throw new Error(
-            'A comment is required when rejecting a document'
-        );
+    if (status === 'rejected' && !comment.trim()) {
+        throw new Error('A comment is required when rejecting a document');
     }
 
-    // find the facility
     const facility = await Facility.findById(facilityId);
 
     if (!facility) {
         throw new Error('Facility not found');
     }
 
+    // retrieves the selected document from the facility profile
     const document = facility[documentType];
 
-    if (!document === 'proofOfLocation') {
+    if (!document?.url) {
         throw new Error('Document has not been uploaded');
     }
 
-    const urlField = `${documentType}_URL`;
-
-    if (!document[urlField]) {
-        throw new Error('Document has not been uploaded');
-    } 
-   
+    // updates the document verification details
     document.verificationStatus = status;
+    document.verificationComment =
+        status === 'rejected' ? comment.trim() : '';
 
-    // save the admin's comment
-    if (status === 'rejected') {
+    document.verifiedAt =
+        status === 'verified' ? new Date() : undefined;
 
-        document.verificationComment = comment.trim();
-    } else {
-        // clear any previous rejection comment
-        document.verificationComment = '';
-    }
-
-    // record when the document was reviewed
-    document.verifiedAt = new Date();
+    // updates the facility's verification status automatically
+    updateFacilityVerificationStatus(facility);
 
     await facility.save();
 
-    // return the updated facility
-    const updatedFacility = await Facility.findById(
-        facility._id
-    ).populate(
+    const updatedFacility = await facility.populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
     );
@@ -256,90 +264,181 @@ const updateFacilityDocumentStatus = async (
     return updatedFacility;
 };
 
-// handles verification or sending the entire facility back to pending
-const updateFacilityVerificationStatus = async (
-    facilityId,
-    status,
-    comment
-) => {
+// handles request to retrieve all pending workers
+const getPendingWorkers = async () => {
 
-    // admin can either verify or send the facility back to pending
-    const allowedStatuses = [
-        'verified',
-        'pending'
-    ];
+    const workers = await Worker.find({
+        verificationStatus: 'pending'
+    }).populate(
+        'user',
+        '-password -verificationOtp -verificationOtpExpires'
+    );
 
-    // check if the status is valid
-    if (!allowedStatuses.includes(status)) {
-        throw new Error(
-            'Invalid verification status. Only verified or pending are allowed.'
-        );
-    }
+    return workers;
+};
 
-    // if admin is sending the facility back to pending,
-    // a comment must be provided
-    if (
-        status === 'pending' &&
-        (!comment || comment.trim() === '')
-    ) {
-        throw new Error(
-            'A comment is required when sending a facility back to pending'
-        );
-    }
 
-    // find the facility
-    const facility = await Facility.findById(facilityId);
+// handles request to retrieve the combined verification queue
+const getVerificationQueue = async () => {
 
-    if (!facility) {
-        throw new Error('Facility not found');
-    }
+    const workers = await Worker.find();
 
-    // before verifying the facility,
-    // make sure all required documents have been verified
-    if (status === 'verified') {
+    const facilities = await Facility.find();
 
-        if (
-            facility.businessRegCert?.verificationStatus !== 'verified' ||
-            facility.facilityLicense?.verificationStatus !== 'verified' ||
-            facility.taxID?.verificationStatus !== 'verified'
-        ) {
-            throw new Error(
-                'All facility documents must be verified before the facility can be verified'
-            );
+    const verificationQueue = [];
+
+    // retrieves individual worker documents awaiting verification
+    workers.forEach(worker => {
+
+        const workerDocuments = [
+            {
+                documentType: 'professionalLicense',
+                document: worker.certifications?.professionalLicense
+            },
+            {
+                documentType: 'idDocument',
+                document: worker.certifications?.idDocument
+            },
+            {
+                documentType: 'educationCert',
+                document: worker.certifications?.educationCert
+            },
+            {
+                documentType: 'proofOfLocation',
+                document: worker.proofOfLocation
+            }
+        ];
+
+        workerDocuments.forEach(({ documentType, document }) => {
+
+            if (
+                document?.url &&
+                document.verificationStatus === 'pending'
+            ) {
+
+                verificationQueue.push({
+                    _id: worker._id,
+                    type: 'worker',
+                    name: worker.fullName,
+                    documentType,
+                    documentUrl: document.url,
+                    documentVerificationStatus: document.verificationStatus,
+                    verificationComment: document.verificationComment,
+                    submittedAt: worker.createdAt
+                });
+
+            }
+
+        });
+
+    });
+
+    // retrieves individual facility documents awaiting verification
+    facilities.forEach(facility => {
+
+        const facilityDocuments = [
+            {
+                documentType: 'businessRegCert',
+                document: facility.businessRegCert
+            },
+            {
+                documentType: 'facilityLicense',
+                document: facility.facilityLicense
+            },
+            {
+                documentType: 'taxID',
+                document: facility.taxID
+            }
+        ];
+
+        facilityDocuments.forEach(({ documentType, document }) => {
+
+            if (
+                document?.url &&
+                document.verificationStatus === 'pending'
+            ) {
+
+                verificationQueue.push({
+                    _id: facility._id,
+                    type: 'facility',
+                    name: facility.facilityName,
+                    documentType,
+                    documentUrl: document.url,
+                    documentVerificationStatus: document.verificationStatus,
+                    verificationComment: document.verificationComment,
+                    submittedAt: facility.createdAt
+                });
+
+            }
+
+        });
+
+    });
+
+    // sorts the queue by newest submission first
+    verificationQueue.sort(
+        (a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)
+    );
+
+    return verificationQueue;
+};
+
+// handles request to retrieve dashboard statistics
+const getDashboardStats = async () => {
+
+    // retrieve total number of workers
+    const totalWorkers = await Worker.countDocuments();
+
+    // retrieve total number of verified workers
+    const verifiedWorkers = await Worker.countDocuments({
+        verificationStatus: 'verified'
+    });
+
+    // retrieve total number of facilities
+    const totalFacilities = await Facility.countDocuments();
+
+    // retrieve total number of verified facilities
+    const verifiedFacilities = await Facility.countDocuments({
+        verificationStatus: 'verified'
+    });
+
+    // retrieve the total number of individual documents awaiting verification
+    const verificationQueue = await getVerificationQueue();
+
+    const pendingVerifications = verificationQueue.length;
+
+    // retrieve total number of active shifts
+    const activeShifts = await Shift.countDocuments({
+        status: {
+            $in: ['open', 'filled']
         }
-    }
+    });
 
-    // update the overall facility verification status
-    facility.verificationStatus = status;
+    // retrieve total number of completed shifts
+    const completedShifts = await Shift.countDocuments({
+        status: 'completed'
+    });
 
-    // save the admin's comment
-    if (status === 'pending') {
-
-        facility.verificationComment = comment.trim();
-
-        // remove the previous verification date
-        facility.verifiedAt = undefined;
-
-    } else {
-
-        // clear any previous pending/rejection comment
-        facility.verificationComment = '';
-
-        // record when the facility was verified
-        facility.verifiedAt = new Date();
-    }
-
-    await facility.save();
-
-    // return the updated facility
-    const updatedFacility = await Facility.findById(
-        facility._id
-    ).populate(
-        'user',
-        '-password -verificationOtp -verificationOtpExpires'
-    );
-
-    return updatedFacility;
+    return {
+        totalWorkers,
+        verifiedWorkers,
+        totalFacilities,
+        verifiedFacilities,
+        pendingVerifications,
+        activeShifts,
+        completedShifts
+    };
 };
 
-export default { getAllWorkers, getWorkerById, updateWorkerDocumentStatus, getAllFacilities, getPendingFacilities, getFacilityById, updateFacilityDocumentStatus, updateFacilityVerificationStatus };
+export default {
+    getAllWorkers,
+    getWorkerById,
+    updateWorkerDocumentStatus,
+    getAllFacilities,
+    getPendingFacilities,
+    getFacilityById,
+    updateFacilityDocumentStatus,
+    getPendingWorkers,
+    getVerificationQueue,
+    getDashboardStats
+};

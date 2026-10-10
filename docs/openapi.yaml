@@ -1,0 +1,787 @@
+openapi: 3.0.3
+info:
+  title: CAREPORIUM Backend API
+  version: 1.0.0
+  description: |
+    OpenAPI documentation for the CAREPORIUM healthcare-worker shift marketplace backend.
+    This specification is based on the endpoints and request fields discussed so far.
+    Confirm each path and HTTP method against the project's route files before treating it
+    as an exact representation of the running server.
+servers:
+  - url: http://localhost:8089
+    description: Local development server
+tags:
+  - name: Authentication
+  - name: Worker Profiles
+  - name: Facility Profiles
+  - name: Shifts
+  - name: Shift Applications
+  - name: Attendance
+  - name: Admin
+security:
+  - bearerAuth: []
+paths:
+  /api/auth/v1/register/worker:
+    post:
+      tags: [Authentication]
+      summary: Register a worker account and profile
+      description: Multipart form fields may include worker details and optional profile documents, depending on the current registration controller.
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [fullName, email, phoneNumber, password]
+              properties:
+                fullName: { type: string, example: Ada Okafor }
+                email: { type: string, format: email, example: ada@example.com }
+                phoneNumber: { type: string, example: "+2348012345678" }
+                password: { type: string, format: password, minLength: 8 }
+                profession: { type: string, example: Nurse }
+                specialty: { type: string, example: Emergency }
+                yearsOfExperience: { type: integer, minimum: 0, example: 3 }
+                address: { type: string }
+                street: { type: string }
+                state: { type: string }
+                country: { type: string, example: Nigeria }
+                professionalLicense: { type: string, format: binary }
+                idDocument: { type: string, format: binary }
+                educationCert: { type: string, format: binary }
+                proofOfLocation: { type: string, format: binary }
+      responses:
+        '201':
+          description: Worker account created; verification email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/auth/v1/register/facility:
+    post:
+      tags: [Authentication]
+      summary: Register a facility account and upload required documents
+      description: Requires the three document uploads shown below. Location and secondary-contact fields use dotted multipart field names.
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [facilityName, facilityType, email, phoneNumber, password, businessRegCert, facilityLicense, taxID]
+              properties:
+                facilityName: { type: string, example: CarePlus Hospital }
+                facilityType: { type: string, example: Hospital }
+                email: { type: string, format: email }
+                phoneNumber: { type: string }
+                password: { type: string, format: password, minLength: 8 }
+                location.address: { type: string }
+                location.city: { type: string }
+                location.state: { type: string }
+                location.country: { type: string, example: Nigeria }
+                secondaryContact.fullName: { type: string }
+                secondaryContact.position: { type: string }
+                secondaryContact.email: { type: string, format: email }
+                secondaryContact.phoneNumber: { type: string }
+                businessRegCert: { type: string, format: binary }
+                facilityLicense: { type: string, format: binary }
+                taxID: { type: string, format: binary }
+      responses:
+        '201':
+          description: Facility account created; verification email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/auth/v1/verify-account:
+    post:
+      tags: [Authentication]
+      summary: Verify account with email OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp]
+              properties:
+                email: { type: string, format: email }
+                otp: { type: string, minLength: 6, maxLength: 6, example: '123456' }
+      responses:
+        '200':
+          description: Account verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/auth/v1/resend-otp:
+    post:
+      tags: [Authentication]
+      summary: Resend account verification OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/auth/v1/login:
+    post:
+      tags: [Authentication]
+      summary: Log in and receive a JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserSummary'
+                  token: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/auth/v1/logout:
+    post:
+      tags: [Authentication]
+      summary: Log out by invalidating previously issued tokens
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/auth/v1/get-profile:
+    get:
+      tags: [Authentication]
+      summary: Get the authenticated user's base profile
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/auth/v1/update-profile:
+    put:
+      tags: [Authentication]
+      summary: Update the authenticated user's base profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+                phoneNumber: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/auth/v1/delete-profile/{userId}:
+    delete:
+      tags: [Authentication]
+      summary: Delete a user account and its associated profile
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/auth/v1/forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Request a password-reset OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/auth/v1/reset-password:
+    post:
+      tags: [Authentication]
+      summary: Reset password using OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp, newPassword]
+              properties:
+                email: { type: string, format: email }
+                otp: { type: string, example: '123456' }
+                newPassword: { type: string, format: password, minLength: 8 }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/worker/v1/get-worker-profile/{userId}:
+    get:
+      tags: [Worker Profiles]
+      summary: Get a worker profile
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/worker/v1/update-worker-profile/{userId}:
+    put:
+      tags: [Worker Profiles]
+      summary: Update a worker profile and upload documents
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                fullName: { type: string }
+                profession: { type: string }
+                specialty: { type: string }
+                yearsOfExperience: { type: integer, minimum: 0 }
+                about: { type: string }
+                address: { type: string }
+                street: { type: string }
+                state: { type: string }
+                country: { type: string }
+                professionalLicense: { type: string, format: binary }
+                idDocument: { type: string, format: binary }
+                educationCert: { type: string, format: binary }
+                proofOfLocation: { type: string, format: binary }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/facility/v1/get-facility-profile:
+    get:
+      tags: [Facility Profiles]
+      summary: Get the authenticated facility profile
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/facility/v1/update-facility-profile:
+    put:
+      tags: [Facility Profiles]
+      summary: Update the authenticated facility profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                facilityName: { type: string }
+                facilityType: { type: string }
+                location:
+                  $ref: '#/components/schemas/Location'
+                secondaryContact:
+                  $ref: '#/components/schemas/SecondaryContact'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/shifts/v1/create-shift:
+    post:
+      tags: [Shifts]
+      summary: Create a shift
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShiftInput'
+      responses:
+        '201':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/shifts/v1/get-shifts:
+    get:
+      tags: [Shifts]
+      summary: Retrieve shifts
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, example: open }
+        - in: query
+          name: role
+          schema: { type: string }
+        - in: query
+          name: specialty
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /api/shifts/v1/get-single-shift/{shiftId}:
+    get:
+      tags: [Shifts]
+      summary: Retrieve a shift by ID
+      parameters:
+        - $ref: '#/components/parameters/ShiftId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/shifts/v1/get-facility-shifts:
+    get:
+      tags: [Shifts]
+      summary: Retrieve shifts posted by the authenticated facility
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /api/shifts/v1/update-shift/{shiftId}:
+    put:
+      tags: [Shifts]
+      summary: Update a shift
+      parameters:
+        - $ref: '#/components/parameters/ShiftId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShiftInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/shifts/v1/close-shift/{shiftId}:
+    patch:
+      tags: [Shifts]
+      summary: Close a shift
+      parameters:
+        - $ref: '#/components/parameters/ShiftId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /api/shifts/v1/complete-shift/{shiftId}:
+    patch:
+      tags: [Shifts]
+      summary: Mark a shift as completed
+      parameters:
+        - $ref: '#/components/parameters/ShiftId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /api/shifts/v1/delete-shift/{shiftId}:
+    delete:
+      tags: [Shifts]
+      summary: Delete a shift
+      parameters:
+        - $ref: '#/components/parameters/ShiftId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/applications/v1/apply/{shiftId}:
+    post:
+      tags: [Shift Applications]
+      summary: Apply for a shift as a worker
+      parameters:
+        - $ref: '#/components/parameters/ShiftId'
+      responses:
+        '201':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/applications/v1/my-applications:
+    get:
+      tags: [Shift Applications]
+      summary: Retrieve applications submitted by the authenticated worker
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /api/applications/v1/facility-applications:
+    get:
+      tags: [Shift Applications]
+      summary: Retrieve applications for the authenticated facility's shifts
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /api/applications/v1/accept/{applicationId}:
+    patch:
+      tags: [Shift Applications]
+      summary: Accept a shift application
+      parameters:
+        - $ref: '#/components/parameters/ApplicationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /api/applications/v1/reject/{applicationId}:
+    patch:
+      tags: [Shift Applications]
+      summary: Reject a shift application
+      parameters:
+        - $ref: '#/components/parameters/ApplicationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /api/attendance/v1/qr/{shiftId}:
+    get:
+      tags: [Attendance]
+      summary: Generate or retrieve a shift attendance QR token
+      parameters:
+        - $ref: '#/components/parameters/ShiftId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /api/attendance/v1/clock-in:
+    post:
+      tags: [Attendance]
+      summary: Clock in using a QR token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qrToken]
+              properties:
+                qrToken: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/attendance/v1/clock-out:
+    post:
+      tags: [Attendance]
+      summary: Clock out using a QR token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qrToken]
+              properties:
+                qrToken: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/admin/v1/workers:
+    get:
+      tags: [Admin]
+      summary: Retrieve all workers
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/admin/v1/workers/{workerId}:
+    get:
+      tags: [Admin]
+      summary: Retrieve one worker by ID
+      parameters:
+        - $ref: '#/components/parameters/WorkerId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/admin/v1/workers/{workerId}/documents:
+    patch:
+      tags: [Admin]
+      summary: Verify or reject a worker document
+      parameters:
+        - $ref: '#/components/parameters/WorkerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/admin/v1/facilities:
+    get:
+      tags: [Admin]
+      summary: Retrieve all facilities
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/admin/v1/pending-facilities:
+    get:
+      tags: [Admin]
+      summary: Retrieve pending facilities
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /api/admin/v1/facilities/{facilityId}:
+    get:
+      tags: [Admin]
+      summary: Retrieve one facility by ID
+      parameters:
+        - $ref: '#/components/parameters/FacilityId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/admin/v1/facilities/{facilityId}/documents:
+    patch:
+      tags: [Admin]
+      summary: Verify or reject one facility document
+      parameters:
+        - $ref: '#/components/parameters/FacilityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentReviewInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/admin/v1/pending-workers:
+    get:
+      tags: [Admin]
+      summary: Retrieve pending workers
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+  /api/admin/v1/verification-queue:
+    get:
+      tags: [Admin]
+      summary: Retrieve all individual worker and facility documents pending verification
+      responses:
+        '200':
+          description: Combined verification queue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VerificationQueueItem'
+  /api/admin/v1/dashboard-stats:
+    get:
+      tags: [Admin]
+      summary: Retrieve admin dashboard statistics
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    UserId:
+      in: path
+      name: userId
+      required: true
+      schema: { type: string }
+    WorkerId:
+      in: path
+      name: workerId
+      required: true
+      schema: { type: string }
+    FacilityId:
+      in: path
+      name: facilityId
+      required: true
+      schema: { type: string }
+    ShiftId:
+      in: path
+      name: shiftId
+      required: true
+      schema: { type: string }
+    ApplicationId:
+      in: path
+      name: applicationId
+      required: true
+      schema: { type: string }
+  schemas:
+    RegistrationResponse:
+      type: object
+      properties:
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            userId: { type: string }
+            workerId: { type: string }
+            facilityId: { type: string }
+    UserSummary:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [worker, facility, admin] }
+        isVerified: { type: boolean }
+    Location:
+      type: object
+      properties:
+        address: { type: string }
+        street: { type: string }
+        city: { type: string }
+        state: { type: string }
+        country: { type: string }
+    SecondaryContact:
+      type: object
+      properties:
+        fullName: { type: string }
+        position: { type: string }
+        email: { type: string, format: email }
+        phoneNumber: { type: string }
+    ShiftInput:
+      type: object
+      required: [role, date, startTime, endTime]
+      properties:
+        role: { type: string, example: Nurse }
+        specialty: { type: string }
+        workType: { type: string }
+        description: { type: string }
+        requirements:
+          oneOf:
+            - type: array
+              items: { type: string }
+            - type: string
+        professionalsNeeded: { type: integer, minimum: 1 }
+        date: { type: string, format: date }
+        startTime: { type: string, example: "08:00" }
+        endTime: { type: string, example: "16:00" }
+        shiftType: { type: string }
+        location:
+          $ref: '#/components/schemas/Location'
+    DocumentReviewInput:
+      type: object
+      required: [documentType, status]
+      properties:
+        documentType:
+          type: string
+          enum: [professionalLicense, idDocument, educationCert, proofOfLocation, businessRegCert, facilityLicense, taxID]
+          example: businessRegCert
+        status:
+          type: string
+          enum: [verified, rejected]
+          example: verified
+        comment:
+          type: string
+          example: Document reviewed and approved.
+    VerificationQueueItem:
+      type: object
+      properties:
+        _id: { type: string }
+        type: { type: string, enum: [worker, facility] }
+        name: { type: string }
+        documentType: { type: string }
+        documentUrl: { type: string, format: uri }
+        documentVerificationStatus: { type: string, enum: [pending] }
+        verificationComment: { type: string }
+        submittedAt: { type: string, format: date-time }
+    SuccessResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        message: { type: string }
+        data: {}
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string, example: Something went wrong }
+  responses:
+    Success:
+      description: Request completed successfully
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SuccessResponse'
+    BadRequest:
+      description: Invalid input or request could not be completed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication required or token invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: User is not permitted to perform this action
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

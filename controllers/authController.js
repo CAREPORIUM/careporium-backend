@@ -1,5 +1,5 @@
 import { registerWorker, registerFacility, verifyAccount, resendVerificationOtp,
-         loginUser, getProfile, deleteUser } from '../services/authService.js';
+         loginUser, logoutUser, getProfile, forgotPassword, resetPassword, deleteUser } from '../services/authService.js';
 
 // handles worker's registeration
 // worker registration
@@ -77,7 +77,7 @@ const resendVerificationOtpController = async (req, res) => {
     }
 };
 
-// user login
+// login user
 const loginUserController = async (req, res) => {
   try {
     const result = await loginUser(req.body);
@@ -90,6 +90,28 @@ const loginUserController = async (req, res) => {
         res.status(400).json({
             message: error.message
         });
+    }
+};
+
+// logout user
+const logoutUserController = async (req, res) => {
+
+    try {
+
+        const result = await logoutUser(req.user.id);
+
+        return res.status(200).json({
+            success: true,
+            message: result.message
+        });
+
+    } catch (error) {
+
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
     }
 };
 
@@ -106,6 +128,64 @@ const getProfileController = async (req, res) => {
             success: false,
             message: error.message
         });
+    }
+};
+
+// forgot password
+const forgotPasswordController = async (req, res) => {
+
+    try {
+
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email is required'
+            });
+        }
+
+        const result = await forgotPassword(email);
+
+        return res.status(200).json({
+            success: true,
+            message: result.message
+        });
+
+    } catch (error) {
+
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+  }
+
+const resetPasswordController = async (req, res) => {
+
+    try {
+
+        const { email, otp, newPassword } = req.body;
+
+        const result = await resetPassword(
+            email,
+            otp,
+            newPassword
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: result.message
+        });
+
+    } catch (error) {
+
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
+
     }
 };
 
@@ -128,4 +208,4 @@ const deleteUserController = async (req, res) => {
 };
 
 export { registerWorkerController, registerFacilityController, verifyAccountController, resendVerificationOtpController,
-         loginUserController,   getProfileController, deleteUserController};
+         loginUserController, logoutUserController, getProfileController, forgotPasswordController, resetPasswordController, deleteUserController};

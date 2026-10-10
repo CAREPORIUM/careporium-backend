@@ -59,37 +59,36 @@ const workerSchema = new mongoose.Schema(
       },
       country: { type: String },
     },
-    proofOfLocation: { type: String, default: "" },
+    proofOfLocation: {
+        url: { type: String, default: "" },
+        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+        verificationComment: { type: String, default: "" },
+        verifiedAt: { type: Date },
+    },
     certifications: {
       professionalLicense: {
         url: { type: String, default: "" },
-        verificationStatus: {
-          type: String,
-          enum: ["pending", "verified", "rejected"],
-          default: "pending",
-        },
+        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+        verificationComment: { type: String, default: "" },
         verifiedAt: { type: Date },
       },
-      professionalLicense: {
+      idDocument: {
         url: { type: String, default: "" },
-        verificationStatus: {
-          type: String,
-          enum: ["pending", "verified", "rejected"],
-          default: "pending",
-        },
+        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+        verificationComment: { type: String, default: "" }, 
         verifiedAt: { type: Date },
       },
-      professionalLicense: {
+      educationCert: {
         url: { type: String, default: "" },
-        verificationStatus: {
-          type: String,
-          enum: ["pending", "verified", "rejected"],
-          default: "pending",
-        },
+        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+        verificationComment: { type: String, default: "" },
         verifiedAt: { type: Date },
       },
     },
+    verificationStatus: { type: String, enum: ["pending", "verified"], default: "pending" },
+    verifiedAt: { type: Date },
     about: { type: String },
+
   },
   { timestamps: true },
 );

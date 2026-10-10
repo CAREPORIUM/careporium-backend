@@ -1,4 +1,5 @@
 import Facility from '../models/facilityModel.js'
+import cloudinary from '../config/cloudinary.js'
 
 
 // handles retrieval of facility's profile
@@ -18,8 +19,10 @@ const getFacilityProfile = async (userId) => {
 
 
 // handles updating of facility's profile
-const updateFacilityProfile = async (userId, updateData) => {
-
+const updateFacilityProfile = async (
+    userId, 
+    updateData = {}, 
+    files = {}) => {
     // only allow these facility profile field to be updated
     const allowedFields = [
         'facilityName',
@@ -34,62 +37,114 @@ const updateFacilityProfile = async (userId, updateData) => {
         }
     }
 
-        // check if any location information was provided
-// Check if any location information was provided
-if (
-    updateData.locationaddress !== undefined ||
-    updateData.locationcity !== undefined ||
-    updateData.locationstate !== undefined ||
-    updateData.locationcountry !== undefined
-) {
-    // Create the location object
-    filteredData.location = {
-        address: updateData.locationaddress,
-        city: updateData.locationcity,
-        state: updateData.locationstate,
-        country: updateData.locationcountry
+    // check if any location information was provided
+    const locationFields = {
+        address: updateData.locationAddress ?? updateData.locationaddress,
+        city: updateData.locationCity ?? updateData.locationcity,
+        state: updateData.locationState ?? updateData.locationstate,
+        country: updateData.locationCountry ?? updateData.locationcountry
     };
-}
 
-    // check if any secondary contact information was provided
-    if (
-        updateData.secondaryContactfullName !== undefined ||
-        updateData.secondaryContactposition !== undefined ||
-        updateData.secondaryContactemail !== undefined ||
-        updateData.secondaryContactphoneNumber !== undefined
-    ) {
-
-        // create the secondary contact object
-        filteredData.secondaryContact = {
-        fullName: updateData.secondaryContactfullName,
-        position: updateData.secondaryContactposition,
-        email: updateData.secondaryContactemail,
-        phoneNumber: updateData.secondaryContactphoneNumber
-    };
+    for (const [field, value] of Object.entries(locationFields)) {
+        if (value !== undefined) {
+            filteredData[`location.${field}`] = value;
+        }
     }
 
-    const facility = await Facility.findOneAndUpdate(
-        {
-            user: userId
-        },
-        filteredData,
-        {
-            returnDocument: 'after',
-            runValidators: true
+    // check if any secondary contact information was provided
+    const secondaryContactFields = {
+        fullName: updateData.secondaryContactFullName ??
+            updateData.secondaryContactfullName,
+        position: updateData.secondaryContactPosition ??
+            updateData.secondaryContactposition,
+        email: updateData.secondaryContactEmail ??
+            updateData.secondaryContactemail,
+        phoneNumber: updateData.secondaryContactPhoneNumber ??
+            updateData.secondaryContactphoneNumber
+    };
+
+    for (const [field, value] of Object.entries(secondaryContactFields)) {
+        if (value !== undefined) {
+            filteredData[`secondaryContact.${field}`] = value;
         }
-    ).populate(
-        'user','-password -verificationOtp -verificationOtpExpires'
-    );
+    }
+
+    // find the facility profile
+    const facility = await Facility.findOne({
+        user: userId
+    });
 
     if (!facility) {
         throw new Error('Facility profile not found');
     }
 
-    return facility;
+    // update the facility's profile information
+    Object.assign(facility, filteredData);
+
+    // check if a business registration certificate was uploaded
+    if (files?.businessRegCert?.[0]) {
+        const businessRegCertUpload = await cloudinary.uploader.upload(
+            files.businessRegCert[0].path,
+            { folder: 'careporium/facility-documents' }
+        );
+
+        facility.businessRegCert.url = businessRegCertUpload.secure_url;
+        facility.businessRegCert.verificationStatus = 'pending';
+        facility.businessRegCert.verificationComment = '';
+        facility.businessRegCert.verifiedAt = undefined;
+    }
+
+    // check if a facility license was uploaded
+    if (files?.facilityLicense?.[0]) {
+        const facilityLicenseUpload = await cloudinary.uploader.upload(
+            files.facilityLicense[0].path,
+            { folder: 'careporium/facility-documents' }
+        );
+
+        facility.facilityLicense.url = facilityLicenseUpload.secure_url;
+        facility.facilityLicense.verificationStatus = 'pending';
+        facility.facilityLicense.verificationComment = '';
+        facility.facilityLicense.verifiedAt = undefined;
+    }
+
+    // check if a tax ID document was uploaded
+    if (files?.taxID?.[0]) {
+        const taxIDUpload = await cloudinary.uploader.upload(
+            files.taxID[0].path,
+            { folder: 'careporium/facility-documents' }
+        );
+
+        facility.taxID.url = taxIDUpload.secure_url;
+        facility.taxID.verificationStatus = 'pending';
+        facility.taxID.verificationComment = '';
+        facility.taxID.verifiedAt = undefined;
+    }
+
+    // check if any verification document was replaced
+    const documentReplaced =
+        files?.businessRegCert?.[0] ||
+        files?.facilityLicense?.[0] ||
+        files?.taxID?.[0];
+
+    // reset overall verification when a document is replaced
+    if (documentReplaced) {
+        facility.verificationStatus = 'pending';
+        facility.verifiedAt = undefined;
+    }
+
+    // save the updated facility profile
+    await facility.save();
+
+    // get the updated facility profile and populate the user information
+    const updatedFacility = await Facility.findById(
+        facility._id
+    ).populate(
+        'user',
+        '-password -verificationOtp -verificationOtpExpires'
+    );
+
+    return updatedFacility;
 };
 
 
-export {
-    getFacilityProfile,
-    updateFacilityProfile
-};
+export { getFacilityProfile, updateFacilityProfile };

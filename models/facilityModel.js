@@ -48,29 +48,25 @@ const facilitySchema = new mongoose.Schema(
       country: { type: String, required: true }
     },
     businessRegCert: {
-      businessRegCert_URL: { type: String, required: true },
-      verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
-      verificationComment: { type: String, default: "" }, verifiedAt: { type: Date } }, 
+        url: { type: String, default: "" },
+        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+        verificationComment: { type: String, default: "" }, 
+        verifiedAt: { type: Date }
+    }, 
     facilityLicense: {
-      facilityLicense_URL: { type: String, required: true },
-      verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
-      verificationComment: { type: String, default: "" }, verifiedAt: { type: Date }}, 
+        url: { type: String, default: "" },
+        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+        verificationComment: { type: String, default: "" }, 
+        verifiedAt: { type: Date },
+    }, 
     taxID: {
-      taxID_URL: { type: String, required: true },
-      verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
-      verificationComment: { type: String, default: "" }, verifiedAt: { type: Date }},
-    verificationStatus: {
-      type: String,
-      enum: ["pending", "verified"],
-      default: "pending"
+        url: { type: String, default: "" },
+        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+        verificationComment: { type: String, default: "" }, 
+        verifiedAt: { type: Date },
     },
-    verificationComment: {
-      type: String,
-      default: ""
-    },
-    verfiedAt: {
-      type: Date
-    },
+    verificationStatus: { type: String, enum: ["pending", "verified"], default: "pending" },
+    verifiedAt: { type: Date },
     secondaryContact: { fullName: { type: String, default: ""}, position: { type: String, default: "" }, 
     email: { type: String, default: "" }, phoneNumber: { type: String, default: "" } }
   }, { timestamps: true },

@@ -12,6 +12,8 @@ router.get('/facilities', authMiddleware, adminMiddleware, adminController.getFa
 router.get('/facilities/pending', authMiddleware, adminMiddleware, adminController.getPendingFacilities);
 router.get('/facilities/:facilityId', authMiddleware, adminMiddleware, adminController.getOneFacility);
 router.patch('/facilities/:facilityId/documents', authMiddleware, adminMiddleware, adminController.updateFacilityDocStatus);
-router.patch('/facilities/:facilityId/verification', authMiddleware, adminMiddleware, adminController.updateFacilityStatus);
+router.get('/dashboard/stats', authMiddleware, adminMiddleware, adminController.getDashboardStats);
+router.get('/verification-queue', authMiddleware, adminMiddleware, adminController.getVerificationQueue);
+router.get('/workers/pending', authMiddleware, adminMiddleware, adminController.getPendingWorkers);
 
 export default router;

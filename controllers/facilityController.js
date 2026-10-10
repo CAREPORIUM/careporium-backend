@@ -25,11 +25,13 @@ const updateFProfile = async (req, res) => {
     try {
         const facility = await updateFacilityProfile(
             req.user.id,
-            req.body
+            req.body || {},
+            req.files || {}
         );
 
         res.status(200).json({
             success: true,
+            message: 'Facility profile updated successfully',
             data: facility
         });
 
