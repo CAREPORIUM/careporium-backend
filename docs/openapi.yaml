@@ -9,7 +9,9 @@ info:
     as an exact representation of the running server.
 
 servers:
-  - url: http://localhost:8089
+  - url: https://careporium-backend.onrender.com
+    description: Production server
+  - url: https://localhost:8089
     description: Local development server
 
 tags:
