@@ -8,7 +8,7 @@ info:
     Confirm each path and HTTP method against the project's route files before treating it
     as an exact representation of the running server.
     
- servers:
+servers:
   - url: https://careporium-backend.onrender.com
     description: Production server
   - url: https://localhost:8089
