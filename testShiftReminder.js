@@ -19,20 +19,20 @@ const runTest = async () => {
 
   await connectDB();
 
-  // Keep the rest of your existing test code here.
-   const shift = await Shift.findById(shiftId);
+  const shift = await Shift.findById(shiftId);
 
   if (!shift) {
     throw new Error("Test shift not found.");
   }
 
   const [hours, minutes] = shift.startTime.split(":").map(Number);
-  const shiftStartsAt = new Date(shift.date);
+
+  const shiftStartsAt = new Date(shift.shiftDate);
   shiftStartsAt.setHours(hours, minutes, 0, 0);
 
-  // Simulate a time when the 24-hour reminder is due.
+  // Simulate a time when the 2-hour reminder is due.
   const simulatedNow =
-  shiftStartsAt.getTime() - 2 * 60 * 60 * 1000 + 30_000;
+    shiftStartsAt.getTime() - 2 * 60 * 60 * 1000 + 30_000;
 
   const before = await Notification.countDocuments({
     type: "SHIFT_STARTING_SOON",
@@ -43,17 +43,17 @@ const runTest = async () => {
   await sendShiftReminders({ now: simulatedNow, shiftId });
   await sendShiftReminders({ now: simulatedNow, shiftId });
 
-const savedShift = await Shift.findById(shiftId).select("remindersSent");
+  const savedShift = await Shift.findById(shiftId).select("remindersSent");
 
-console.log(
-  "Reminder records saved on shift:",
-  savedShift?.remindersSent
-);
+  console.log(
+    "Reminder records saved on shift:",
+    savedShift?.remindersSent
+  );
 
   const after = await Notification.countDocuments({
     type: "SHIFT_STARTING_SOON",
     resourceId: shift._id,
-    title: "Your shift is tomorrow",
+    title: "Your shift starts in 2 hours",
   });
 
   console.log({
@@ -72,5 +72,3 @@ runTest()
   .finally(async () => {
     await mongoose.disconnect();
   });
-
- 

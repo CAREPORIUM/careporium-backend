@@ -37,9 +37,9 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
       continue;
     }
 
-    const shiftDate = DateTime.fromJSDate(new Date(shift.date), {
-      zone: "utc",
-    }).toISODate();
+    const shiftDate = DateTime.fromISO(shift.shiftDate, {
+  zone: "utc",
+}).toISODate();
 
     const shiftStartsAt = DateTime.fromISO(
       `${shiftDate}T${shift.startTime}`,
