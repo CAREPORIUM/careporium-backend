@@ -43,7 +43,7 @@ const registerWorker = async (workerData) => {
         phoneNumber,
         password: hashedPassword,
         role: 'worker',
-        isVerified: false
+        isVerified: false,
     });
 
     // generate a 6-digit OTP

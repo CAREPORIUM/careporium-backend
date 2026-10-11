@@ -9,8 +9,11 @@ info:
     as an exact representation of the running server.
 
 servers:
-  - url: https://careporium-backend.onrender.com/api-docs/
+  - url: https://careporium-backend.onrender.com
+    description: Production server
+  - url: http://localhost:8089
     description: Local development server
+  
 
 tags:
   - name: Authentication
@@ -29,31 +32,28 @@ paths:
     post:
       tags: [Authentication]
       summary: Register a worker account and profile
-      description: Multipart form fields may include worker details and optional profile documents, depending on the current registration controller.
+      description: fullName, email and password are required. Other information can be updated by the worker after login.
       security: []
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
-              required: [fullName, email, phoneNumber, password]
+              required: [fullName, email, password]
               properties:
                 fullName: { type: string, example: Ada Okafor }
                 email: { type: string, format: email, example: ada@example.com }
-                phoneNumber: { type: string, example: "+2348012345678" }
                 password: { type: string, format: password, minLength: 8 }
+                phoneNumber: { type: string }
                 profession: { type: string, example: Nurse }
-                specialty: { type: string, example: Emergency }
+                specialty: { type: string, example: Auxillary }
                 yearsOfExperience: { type: integer, minimum: 0, example: 3 }
-                address: { type: string }
-                street: { type: string }
-                state: { type: string }
-                country: { type: string, example: Nigeria }
-                professionalLicense: { type: string, format: binary }
-                idDocument: { type: string, format: binary }
-                educationCert: { type: string, format: binary }
-                proofOfLocation: { type: string, format: binary }
+                location.address: { type: string }
+                location.city: { type: string }
+                location.state: { type: string }
+                location.country: { type: string, example: Nigeria }
+
       responses:
         '201':
           description: Worker account created; verification email sent
@@ -76,7 +76,7 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [facilityName, facilityType, email, phoneNumber, password, businessRegCert, facilityLicense, taxID]
+              required: [facilityName, facilityType, email, phoneNumber, password, location.address, location.city, location.state, location.country, businessRegCert, facilityLicense, taxID]
               properties:
                 facilityName: { type: string, example: CarePlus Hospital }
                 facilityType: { type: string, example: Hospital }

@@ -1,4 +1,3 @@
-import { truncate } from "fs/promises";
 import mongoose from "mongoose";
 
 const shiftSchema = new mongoose.Schema(
@@ -103,7 +102,19 @@ const shiftSchema = new mongoose.Schema(
         assignedWorkers: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Worker"
-        }]
+        }],
+
+        status: {
+            type: String,
+            enum: [
+                "pending_payment",
+                "open",
+                "filled",
+                "closed",
+                "completed"
+            ],
+            default: "pending_payment"
+        },
     },
     {
         timestamps: true

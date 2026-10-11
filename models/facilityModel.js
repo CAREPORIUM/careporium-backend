@@ -48,19 +48,19 @@ const facilitySchema = new mongoose.Schema(
       country: { type: String, required: true }
     },
     businessRegCert: {
-        url: { type: String, default: "" },
+        url: { type: String, required: true },
         verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
         verificationComment: { type: String, default: "" }, 
         verifiedAt: { type: Date }
     }, 
     facilityLicense: {
-        url: { type: String, default: "" },
+        url: { type: String, required: true },
         verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
         verificationComment: { type: String, default: "" }, 
         verifiedAt: { type: Date },
     }, 
     taxID: {
-        url: { type: String, default: "" },
+        url: { type: String, required: true },
         verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
         verificationComment: { type: String, default: "" }, 
         verifiedAt: { type: Date },
