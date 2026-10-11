@@ -198,18 +198,6 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/auth/v1/delete-profile/{userId}:
-    delete:
-      tags: [Authentication]
-      summary: Delete a user account and its associated profile
-      parameters:
-        - $ref: '#/components/parameters/UserId'
-      responses:
-        '200':
-          $ref: '#/components/responses/Success'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
   /api/auth/v1/forgot-password:
     post:
       tags: [Authentication]
