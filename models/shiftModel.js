@@ -109,6 +109,52 @@ const shiftSchema = new mongoose.Schema(
             default: "open"
         },
 
+        remindersSent: [
+       {
+       worker: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Worker",
+        required: true,
+       },
+       reminderType: {
+        type: String,
+        enum: ["24_hours", "2_hours"],
+        required: true,
+        },
+        sentAt: {
+         type: Date,
+         default: Date.now,
+      },
+     },
+
+    ],
+
+    facilityRemindersSent: [
+  {
+    reminderType: {
+      type: String,
+      enum: ["24_hours", "2_hours"],
+      required: true,
+    },
+    sentAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  ],
+ urgentRemindersSent: [
+  {
+    reminderType: {
+      type: String,
+      enum: ["urgent_unfilled"],
+      required: true,
+    },
+    sentAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+   ],
         isUrgent: {
             type: Boolean,
             default: false
