@@ -1,24 +1,17 @@
-
+import { createNotification } from './notificationService.js';
 import Worker from '../models/workerModel.js';
 import Facility from '../models/facilityModel.js';
-import Shift from '../models/shiftModel.js'
-
-
-// handles request to retrieve all workers
+import Shift from '../models/shiftModel.js';
+// Retrieve all workers.
 const getAllWorkers = async () => {
-
-    const workers = await Worker.find().populate(
+    return Worker.find().populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
     );
-
-    return workers;
 };
 
-
-// handles request to retrieve one worker
+// Retrieve one worker.
 const getWorkerById = async (workerId) => {
-
     const worker = await Worker.findById(workerId).populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
@@ -31,10 +24,8 @@ const getWorkerById = async (workerId) => {
     return worker;
 };
 
-
-// updates the worker's verification status based on all required documents
+// Calculate overall worker verification from required documents.
 const updateWorkerVerificationStatus = (worker) => {
-
     const requiredDocuments = [
         worker.certifications?.professionalLicense,
         worker.certifications?.idDocument,
@@ -43,36 +34,30 @@ const updateWorkerVerificationStatus = (worker) => {
     ];
 
     const allDocumentsVerified = requiredDocuments.every(
-        document =>
+        (document) =>
             document?.url &&
             document.verificationStatus === 'verified'
     );
 
     if (allDocumentsVerified) {
-
         if (worker.verificationStatus !== 'verified') {
             worker.verifiedAt = new Date();
         }
 
         worker.verificationStatus = 'verified';
-
     } else {
-
         worker.verificationStatus = 'pending';
         worker.verifiedAt = undefined;
-
     }
 };
 
-
-// handles request to verify or reject a worker document
+// Verify or reject an individual worker document.
 const updateWorkerDocumentStatus = async (
     workerId,
     documentType,
     status,
     comment = ''
 ) => {
-
     const allowedDocuments = [
         'professionalLicense',
         'idDocument',
@@ -98,7 +83,6 @@ const updateWorkerDocumentStatus = async (
         throw new Error('Worker not found');
     }
 
-    // retrieves the selected document from the worker profile
     const document =
         documentType === 'proofOfLocation'
             ? worker.proofOfLocation
@@ -108,57 +92,64 @@ const updateWorkerDocumentStatus = async (
         throw new Error('Document has not been uploaded');
     }
 
-    // updates the document verification details
     document.verificationStatus = status;
     document.verificationComment =
         status === 'rejected' ? comment.trim() : '';
-
     document.verifiedAt =
         status === 'verified' ? new Date() : undefined;
 
-    // updates the worker's verification status automatically
-    updateWorkerVerificationStatus(worker);
+    // Save the updated status before creating a notification.
+    const wasVerified = worker.verificationStatus === 'verified';
 
+    updateWorkerVerificationStatus(worker);
     await worker.save();
 
-    const updatedWorker = await worker.populate(
+    // Notify only when the overall profile first becomes verified.
+    if (!wasVerified && worker.verificationStatus === 'verified') {
+        try {
+            await createNotification({
+                recipient: worker.user,
+                type: 'WORKER_VERIFIED',
+                title: 'Profile Verified',
+                message:
+                    'Congratulations! Your professional profile and required documents have been verified.',
+                resourceType: 'Worker',
+                resourceId: worker._id
+            });
+        } catch (error) {
+            console.error(
+                'Failed to create worker verification notification:',
+                error
+            );
+        }
+    }
+
+    return worker.populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
     );
-
-    return updatedWorker;
 };
 
-
-// handles request to retrieve all facilities
+// Retrieve all facilities.
 const getAllFacilities = async () => {
-
-    const facilities = await Facility.find().populate(
+    return Facility.find().populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
     );
-
-    return facilities;
 };
 
-
-// handles request to retrieve all pending facilities
+// Retrieve facilities awaiting verification.
 const getPendingFacilities = async () => {
-
-    const facilities = await Facility.find({
+    return Facility.find({
         verificationStatus: 'pending'
     }).populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
     );
-
-    return facilities;
 };
 
-
-// handles request to retrieve one facility
+// Retrieve one facility.
 const getFacilityById = async (facilityId) => {
-
     const facility = await Facility.findById(facilityId).populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
@@ -171,10 +162,8 @@ const getFacilityById = async (facilityId) => {
     return facility;
 };
 
-
-// updates the facility's verification status based on all required documents
+// Calculate overall facility verification from required documents.
 const updateFacilityVerificationStatus = (facility) => {
-
     const requiredDocuments = [
         facility.businessRegCert,
         facility.facilityLicense,
@@ -182,36 +171,30 @@ const updateFacilityVerificationStatus = (facility) => {
     ];
 
     const allDocumentsVerified = requiredDocuments.every(
-        document =>
+        (document) =>
             document?.url &&
             document.verificationStatus === 'verified'
     );
 
     if (allDocumentsVerified) {
-
         if (facility.verificationStatus !== 'verified') {
             facility.verifiedAt = new Date();
         }
 
         facility.verificationStatus = 'verified';
-
     } else {
-
         facility.verificationStatus = 'pending';
         facility.verifiedAt = undefined;
-
     }
 };
 
-
-// handles request to verify or reject a facility document
+// Verify or reject an individual facility document.
 const updateFacilityDocumentStatus = async (
     facilityId,
     documentType,
     status,
     comment = ''
 ) => {
-
     const allowedDocuments = [
         'businessRegCert',
         'facilityLicense',
@@ -236,60 +219,67 @@ const updateFacilityDocumentStatus = async (
         throw new Error('Facility not found');
     }
 
-    // retrieves the selected document from the facility profile
     const document = facility[documentType];
 
     if (!document?.url) {
         throw new Error('Document has not been uploaded');
     }
 
-    // updates the document verification details
     document.verificationStatus = status;
     document.verificationComment =
         status === 'rejected' ? comment.trim() : '';
-
     document.verifiedAt =
         status === 'verified' ? new Date() : undefined;
 
-    // updates the facility's verification status automatically
-    updateFacilityVerificationStatus(facility);
+    // Save the updated status before creating a notification.
+    const wasVerified = facility.verificationStatus === 'verified';
 
+    updateFacilityVerificationStatus(facility);
     await facility.save();
 
-    const updatedFacility = await facility.populate(
+    // Notify only when the overall profile first becomes verified.
+    if (!wasVerified && facility.verificationStatus === 'verified') {
+        try {
+            await createNotification({
+                recipient: facility.user,
+                type: 'FACILITY_VERIFIED',
+                title: 'Facility Verified',
+                message:
+                    'Congratulations! Your facility and required documents have been verified.',
+                resourceType: 'Facility',
+                resourceId: facility._id
+            });
+        } catch (error) {
+            console.error(
+                'Failed to create facility verification notification:',
+                error
+            );
+        }
+    }
+
+    return facility.populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
     );
-
-    return updatedFacility;
 };
 
-// handles request to retrieve all pending workers
+// Retrieve workers awaiting verification.
 const getPendingWorkers = async () => {
-
-    const workers = await Worker.find({
+    return Worker.find({
         verificationStatus: 'pending'
     }).populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
     );
-
-    return workers;
 };
 
-
-// handles request to retrieve the combined verification queue
+// Build the combined queue of pending document verifications.
 const getVerificationQueue = async () => {
-
     const workers = await Worker.find();
-
     const facilities = await Facility.find();
-
     const verificationQueue = [];
 
-    // retrieves individual worker documents awaiting verification
-    workers.forEach(worker => {
-
+    workers.forEach((worker) => {
         const workerDocuments = [
             {
                 documentType: 'professionalLicense',
@@ -310,12 +300,10 @@ const getVerificationQueue = async () => {
         ];
 
         workerDocuments.forEach(({ documentType, document }) => {
-
             if (
                 document?.url &&
                 document.verificationStatus === 'pending'
             ) {
-
                 verificationQueue.push({
                     _id: worker._id,
                     type: 'worker',
@@ -323,19 +311,13 @@ const getVerificationQueue = async () => {
                     documentType,
                     documentUrl: document.url,
                     documentVerificationStatus: document.verificationStatus,
-                    //verificationComment: document.verificationComment,
                     submittedAt: worker.createdAt
                 });
-
             }
-
         });
-
     });
 
-    // retrieves individual facility documents awaiting verification
-    facilities.forEach(facility => {
-
+    facilities.forEach((facility) => {
         const facilityDocuments = [
             {
                 documentType: 'businessRegCert',
@@ -352,12 +334,10 @@ const getVerificationQueue = async () => {
         ];
 
         facilityDocuments.forEach(({ documentType, document }) => {
-
             if (
                 document?.url &&
                 document.verificationStatus === 'pending'
             ) {
-
                 verificationQueue.push({
                     _id: facility._id,
                     type: 'facility',
@@ -365,17 +345,12 @@ const getVerificationQueue = async () => {
                     documentType,
                     documentUrl: document.url,
                     documentVerificationStatus: document.verificationStatus,
-                    //verificationComment: document.verificationComment,
                     submittedAt: facility.createdAt
                 });
-
             }
-
         });
-
     });
 
-    // sorts the queue by newest submission first
     verificationQueue.sort(
         (a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)
     );
@@ -383,38 +358,29 @@ const getVerificationQueue = async () => {
     return verificationQueue;
 };
 
-// handles request to retrieve dashboard statistics
+// Retrieve dashboard statistics.
 const getDashboardStats = async () => {
-
-    // retrieve total number of workers
     const totalWorkers = await Worker.countDocuments();
 
-    // retrieve total number of verified workers
     const verifiedWorkers = await Worker.countDocuments({
         verificationStatus: 'verified'
     });
 
-    // retrieve total number of facilities
     const totalFacilities = await Facility.countDocuments();
 
-    // retrieve total number of verified facilities
     const verifiedFacilities = await Facility.countDocuments({
         verificationStatus: 'verified'
     });
 
-    // retrieve the total number of individual documents awaiting verification
     const verificationQueue = await getVerificationQueue();
-
     const pendingVerifications = verificationQueue.length;
 
-    // retrieve total number of active shifts
     const activeShifts = await Shift.countDocuments({
         status: {
             $in: ['open', 'filled']
         }
     });
 
-    // retrieve total number of completed shifts
     const completedShifts = await Shift.countDocuments({
         status: 'completed'
     });

@@ -1,5 +1,3 @@
-
-
 import { DateTime } from "luxon";
 import cron from "node-cron";
 import Shift from "../models/shiftModel.js";
@@ -38,8 +36,8 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
     }
 
     const shiftDate = DateTime.fromISO(shift.shiftDate, {
-  zone: "utc",
-}).toISODate();
+      zone: "utc",
+    }).toISODate();
 
     const shiftStartsAt = DateTime.fromISO(
       `${shiftDate}T${shift.startTime}`,
@@ -53,20 +51,17 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
 
     const timeUntilShift = shiftStartsAt.toMillis() - now;
 
-    // Notify the facility if an urgent shift still needs professionals.
+    // Notify the facility when an urgent shift is still unfilled within two hours.
     if (
       shift.isUrgent &&
       shift.status === "open" &&
       timeUntilShift > 0 &&
       timeUntilShift <= 2 * 60 * 60 * 1000
     ) {
-      const acceptedCount = await Application.countDocuments({
-        shift: shift._id,
-        status: "accepted",
-      });
+      const assignedCount = (shift.assignedWorkers ?? []).length;
 
       const professionalsStillNeeded =
-        shift.professionalsNeeded - acceptedCount;
+        shift.professionalsNeeded - assignedCount;
 
       console.log("[URGENT REMINDER] Conditions checked:", {
         shiftId: shift._id.toString(),
@@ -74,7 +69,7 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
         isUrgent: shift.isUrgent,
         timeUntilShiftMinutes: Math.round(timeUntilShift / 60000),
         professionalsNeeded: shift.professionalsNeeded,
-        acceptedCount,
+        assignedCount,
         professionalsStillNeeded,
       });
 
@@ -131,7 +126,7 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
                 type: "URGENT_SHIFT_UNFILLED",
                 title: "Urgent shift still needs cover",
                 message:
-                  `Your urgent ${shift.role} shift starts in less than 2 hours ` +
+                  `Your urgent ${shift.profession} shift starts in less than 2 hours ` +
                   `and still needs ${professionalsStillNeeded} more professional(s). ` +
                   "Please review the shift and arrange cover.",
                 resourceType: "Shift",
@@ -171,6 +166,7 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
       }
     }
 
+    // Send scheduled reminders to accepted workers and the facility.
     for (const reminder of REMINDER_WINDOWS) {
       if (
         timeUntilShift > reminder.milliseconds ||
@@ -224,7 +220,7 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
               reminder.type === "24_hours"
                 ? "Your shift is tomorrow"
                 : "Your shift starts in 2 hours",
-            message: `Your ${shift.role} shift starts ${
+            message: `Your ${shift.profession} shift starts ${
               reminder.type === "24_hours"
                 ? "in 24 hours"
                 : "in 2 hours"
@@ -259,7 +255,7 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
         }
       }
 
-      // Notify the facility once for this shift and reminder window.
+      // Notify the facility once per shift and reminder window.
       if (applications.length === 0) continue;
 
       const facility = await Facility.findById(shift.facility);
@@ -307,7 +303,7 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
               ? "Your shift is tomorrow"
               : "Your shift starts in 2 hours",
           message:
-            `Your ${shift.role} shift starts ${
+            `Your ${shift.profession} shift starts ${
               reminder.type === "24_hours"
                 ? "in 24 hours"
                 : "in 2 hours"

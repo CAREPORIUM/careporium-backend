@@ -1,3 +1,4 @@
+import { createNotification } from "./notificationService.js";
 import QRCode from "qrcode"
 import Attendance from "../models/attendanceModel.js"
 import Shift from "../models/shiftModel.js"
@@ -129,12 +130,53 @@ const clockOut = async(userId, qrToken) =>{
 
     //calculate total hours worked
     const millisecondsWorked = attendance.clockOutTime - attendance.clockInTime
-    attendance.totalHoursWorked = millisecondsWorked / (1000 * 60 * 60)
-    
-    await attendance.save()
+    attendance.totalHoursWorked = millisecondsWorked / (1000 * 60 * 60);
+await attendance.save();
 
-    return attendance;
+// Notify the facility when all assigned workers have clocked out.
+const facility = await Facility.findById(shift.facility);
+
+if (facility && shift.assignedWorkers.length > 0) {
+    const facilityShifts = await Shift.find({
+        facility: facility._id,
+        status: "filled",
+        assignedWorkers: { $exists: true, $ne: [] },
+    }).select("_id assignedWorkers");
+
+    const attendanceRecords = await Attendance.find({
+        shift: { $in: facilityShifts.map((item) => item._id) },
+        clockOutTime: { $exists: true, $ne: null },
+    }).select("shift worker clockOutTime");
+
+    const readyShifts = facilityShifts.filter((item) =>
+        item.assignedWorkers.length > 0 &&
+        item.assignedWorkers.every((workerId) =>
+            attendanceRecords.some(
+                (record) =>
+                    record.shift.toString() === item._id.toString() &&
+                    record.worker.toString() === workerId.toString()
+            )
+        )
+    );
+
+    const pendingCount = readyShifts.length;
+    const shiftReady = readyShifts.some(
+        (item) => item._id.toString() === shift._id.toString()
+    );
+
+    if (shiftReady) {
+        await createNotification({
+            recipient: facility.user,
+            type: "SHIFT_COMPLETION_CONFIRMATION_REQUIRED",
+            title: "Shift completion confirmation required",
+            message: `You have ${pendingCount} shift${pendingCount === 1 ? "" : "s"} awaiting completion review. Confirm attendance and complete the shift${pendingCount === 1 ? "" : "s"} so payment can proceed.`,
+            resourceType: "Shift",
+            resourceId: shift._id,
+        });
+    }
 }
+
+return attendance;}
 
 export { getShiftQrCode, clockIn, clockOut}
 

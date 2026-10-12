@@ -10,6 +10,20 @@ const createNotification = async ({
   resourceType,
   resourceId,
 }) => {
+  // Avoid duplicate confirmation notifications for the same shift.
+  if (type === "SHIFT_COMPLETION_CONFIRMATION_REQUIRED" && resourceId) {
+    const existingNotification = await Notification.findOne({
+      recipient,
+      type,
+      resourceType,
+      resourceId,
+    });
+
+    if (existingNotification) {
+      return existingNotification;
+    }
+  }
+
   const notification = await Notification.create({
     recipient,
     type,

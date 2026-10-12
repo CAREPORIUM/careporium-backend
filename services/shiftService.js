@@ -1,3 +1,4 @@
+import { createNotification } from "./notificationService.js";
 import Shift from "../models/shiftModel.js";
 import Facility from "../models/facilityModel.js";
 import Attendance from "../models/attendanceModel.js"
@@ -306,13 +307,47 @@ const completeShift = async (userId, shiftId) => {
             "All assigned workers must clock out before the shift can be completed"
         );
     }
-    // mark the shift as completed
+// Mark the shift as completed and awaiting facility confirmation.
     shift.status = "completed";
+    shift.completionConfirmed = false;
 
     await shift.save();
 
     return shift;
 };
+
+const confirmShiftCompletion = async (userId, shiftId) => {
+    const facility = await Facility.findOne({ user: userId });
+
+    if (!facility) {
+        throw new Error("Facility not found for this user");
+    }
+
+    const shift = await Shift.findOne({
+        _id: shiftId,
+        facility: facility._id,
+    });
+
+    if (!shift) {
+        throw new Error(
+            "Shift not found or you are not authorized to confirm it"
+        );
+    }
+
+    if (shift.status !== "completed") {
+        throw new Error("Only completed shifts can be confirmed");
+    }
+
+    if (shift.completionConfirmed) {
+        throw new Error("This shift has already been confirmed");
+    }
+
+    shift.completionConfirmed = true;
+    await shift.save();
+
+    return shift;
+};
+
 
 // delete a shift by facility
 const deleteShift = async (userId, shiftId) => {
@@ -335,4 +370,14 @@ const deleteShift = async (userId, shiftId) => {
     return shift;
 };
 
-export default { createShift, getAllShifts, getShiftById, getShiftsForFacility, updateShift, deleteShift, closeShift, completeShift }
+export default {
+    createShift,
+    getAllShifts,
+    getShiftById,
+    getShiftsForFacility,
+    updateShift,
+    deleteShift,
+    closeShift,
+    completeShift,
+    confirmShiftCompletion,
+};

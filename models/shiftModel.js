@@ -96,6 +96,10 @@ const shiftSchema = new mongoose.Schema(
       default: "open",
     },
 
+   completionConfirmed: {
+   type: Boolean,
+   default: false,
+   },
     remindersSent: [
       {
         worker: {

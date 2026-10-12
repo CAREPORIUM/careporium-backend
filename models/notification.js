@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 
 const notificationSchema = new mongoose.Schema(
@@ -10,21 +9,22 @@ const notificationSchema = new mongoose.Schema(
       index: true,
     },
     type: {
-      type: String,
-      required: true,
-      enum: [
-        "WELCOME",
-        "APPLICATION_RECEIVED",
-        "APPLICATION_STATUS_UPDATED",
-        "FACILITY_VERIFIED",
-        "WORKER_DOCUMENT_STATUS_UPDATED",
-        "SHIFT_STATUS_UPDATED",
-        "PAYMENT_RELEASED",
-        "SHIFT_STARTING_SOON",
-        "URGENT_SHIFT_UNFILLED",
-        "SHIFT_COMPLETION_CONFIRMATION_REQUIRED",
-      ],
-    },
+    type: String,
+    required: true,
+    enum: [
+    "WELCOME",
+    "APPLICATION_RECEIVED",
+    "APPLICATION_STATUS_UPDATED",
+    "FACILITY_VERIFIED",
+    "WORKER_VERIFIED",
+    "WORKER_DOCUMENT_STATUS_UPDATED",
+    "SHIFT_STATUS_UPDATED",
+    "PAYMENT_RELEASED",
+    "SHIFT_STARTING_SOON",
+    "URGENT_SHIFT_UNFILLED",
+    "SHIFT_COMPLETION_CONFIRMATION_REQUIRED",
+  ],
+},
     title: {
       type: String,
       required: true,

@@ -23,13 +23,14 @@ const getWProfile = async (req, res) => {
 
 // receives the update worker's profile request and passes the request data to the...
 // ...updateWorkerProfile service in workerService.js, which handles the update logic
+
 const updateWProfile = async (req, res) => {
-const updateProfile = async (req, res) => {
-    try {
-        const worker = await updateWorkerProfile(
-            req.user.id,
-            req.body
-        );
+  try {
+    const worker = await updateWorkerProfile(
+      req.user.id,
+      req.body,
+      req.files
+    );
 
     res.status(200).json({
       success: true,
@@ -42,6 +43,6 @@ const updateProfile = async (req, res) => {
     });
   }
 };
-}
+
 
 export { getWProfile, updateWProfile };
