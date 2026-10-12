@@ -81,7 +81,7 @@ const registerWorker = async (workerData) => {
             subject: 'Verify your Careporium account',
             text: `Your Careporium verification code is ${otp}. It expires in 5 minutes.`
         });
-    } catch (emailError) {
+    } catch (error) {
         // roll back both records if email fails by deleting entries from the database
         await Worker.deleteOne({ _id: worker._id });
         await User.deleteOne({ _id: user._id });
