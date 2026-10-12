@@ -2,6 +2,7 @@ import Application from "../models/applicationModel.js";
 import Worker from "../models/workerModel.js";
 import Shift from "../models/shiftModel.js";
 import Facility from "../models/facilityModel.js";
+import { createNotification } from "./notificationService.js";
 import crypto from 'crypto'
 
 // workers apply for shifts, this service handles the application logic
@@ -50,6 +51,19 @@ const applyForShift = async (userId, shiftId) => {
     worker: worker._id,
     shift: shiftId,
   });
+
+  try {
+    await createNotification({
+      recipient: userId,
+      type: "APPLICATION_RECEIVED",
+      title: "Application submitted",
+      message: "Your application for the " + shift.profession + " shift has been submitted and is awaiting review.",
+      resourceType: "Application",
+      resourceId: application._id,
+    });
+  } catch (error) {
+    console.error("Application notification failed:", error);
+  }
 
   return application;
 };
@@ -144,7 +158,7 @@ const updateApplicationStatus = async (userId, applicationId, status) => {
   const application = await Application.findById(applicationId)
   .populate({
     path: "worker",
-    select: "fullName profession specialty yearsOfExperience location",
+    select: "user fullName profession specialty yearsOfExperience location",
   }).populate({
       path: "shift"
     })
@@ -167,9 +181,23 @@ const updateApplicationStatus = async (userId, applicationId, status) => {
   }
 
   if (status === "rejected") {
-    application.status = 'rejected'
-    await application.save()
-    return application
+    application.status = "rejected";
+    await application.save();
+
+    try {
+      await createNotification({
+        recipient: application.worker.user,
+        type: "APPLICATION_STATUS_UPDATED",
+        title: "Application update",
+        message: "Your application for the " + application.shift.profession + " shift was not accepted.",
+        resourceType: "Application",
+        resourceId: application._id,
+      });
+    } catch (error) {
+      console.error("Application rejection notification failed:", error);
+    }
+
+    return application;
   }
   // check if the shift still has space for another professional
   if (application.shift.assignedWorkers.length >= application.shift.professionalsNeeded) {
@@ -203,8 +231,22 @@ const updateApplicationStatus = async (userId, applicationId, status) => {
       }
     }
 
-  await application.shift.save() 
+  await application.shift.save();
   await application.save();
+
+  try {
+    await createNotification({
+      recipient: application.worker.user,
+      type: "APPLICATION_STATUS_UPDATED",
+      title: "Application accepted",
+      message: "Your application for the " + application.shift.profession + " shift has been accepted. Check your confirmed shifts for details.",
+      resourceType: "Shift",
+      resourceId: application.shift._id,
+    });
+  } catch (error) {
+    console.error("Application acceptance notification failed:", error);
+  }
+
   return application;
 };
 

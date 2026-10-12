@@ -1,7 +1,9 @@
 import { createNotification } from "./notificationService.js";
 import Shift from "../models/shiftModel.js";
 import Facility from "../models/facilityModel.js";
-import Attendance from "../models/attendanceModel.js"
+import User from "../models/userModel.js";
+import Attendance from "../models/attendanceModel.js";
+import Worker from "../models/workerModel.js"
 
 // create a new shift under a facility's profile
 const createShift = async (userId, shiftData) => {
@@ -31,6 +33,17 @@ const createShift = async (userId, shiftData) => {
     payRate: shiftData.payRate,
     isUrgent: shiftData.isUrgent,
     });
+
+    const workers = await User.find({ role: "worker" }).select("_id");
+
+    await Promise.allSettled(workers.map((worker) => createNotification({
+        recipient: worker._id,
+        type: "SHIFT_POSTED",
+        title: "New shift available",
+        message: "A new " + shift.profession + " shift is available. View the details and apply if interested.",
+        resourceType: "Shift",
+        resourceId: shift._id,
+    })));
 
     return shift;
 };
@@ -309,41 +322,12 @@ const completeShift = async (userId, shiftId) => {
     }
 // Mark the shift as completed and awaiting facility confirmation.
     shift.status = "completed";
-    shift.completionConfirmed = false;
+
 
     await shift.save();
 
-    return shift;
-};
-
-const confirmShiftCompletion = async (userId, shiftId) => {
-    const facility = await Facility.findOne({ user: userId });
-
-    if (!facility) {
-        throw new Error("Facility not found for this user");
-    }
-
-    const shift = await Shift.findOne({
-        _id: shiftId,
-        facility: facility._id,
-    });
-
-    if (!shift) {
-        throw new Error(
-            "Shift not found or you are not authorized to confirm it"
-        );
-    }
-
-    if (shift.status !== "completed") {
-        throw new Error("Only completed shifts can be confirmed");
-    }
-
-    if (shift.completionConfirmed) {
-        throw new Error("This shift has already been confirmed");
-    }
-
-    shift.completionConfirmed = true;
-    await shift.save();
+    const assignedWorkers = await Worker.find({ _id: { $in: shift.assignedWorkers } }).select("user");
+    await Promise.allSettled(assignedWorkers.filter((worker) => worker.user).map((worker) => createNotification({ recipient: worker.user, type: "SHIFT_FEEDBACK_REQUESTED", title: "Share your shift experience", message: "Your shift has been marked as completed. Share your experience to help improve Caperorium.", resourceType: "Shift", resourceId: shift._id })));
 
     return shift;
 };
@@ -379,5 +363,5 @@ export default {
     deleteShift,
     closeShift,
     completeShift,
-    confirmShiftCompletion,
+
 };

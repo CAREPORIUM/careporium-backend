@@ -167,6 +167,11 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
     }
 
     // Send scheduled reminders to accepted workers and the facility.
+    const facilityDetails = await Facility.findById(shift.facility);
+    const facilityName = facilityDetails?.facilityName || "the facility";
+    const startTime = shiftStartsAt.toFormat("h:mm a");
+    const arrivalGuidance = shift.arrivalInstructions || "Follow the facility's arrival instructions";
+
     for (const reminder of REMINDER_WINDOWS) {
       if (
         timeUntilShift > reminder.milliseconds ||
@@ -220,11 +225,12 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
               reminder.type === "24_hours"
                 ? "Your shift is tomorrow"
                 : "Your shift starts in 2 hours",
-            message: `Your ${shift.profession} shift starts ${
-              reminder.type === "24_hours"
-                ? "in 24 hours"
-                : "in 2 hours"
-            }.`,
+            message:
+              `Your ${shift.profession} shift at ${facilityName} starts ${
+                reminder.type === "24_hours" ? "in 24 hours" : "in 2 hours"
+              }, at ${startTime} WAT. ` +
+              `Location: ${shift.location || "See shift details"}. ` +
+              `Arrival guidance: ${arrivalGuidance}. Check Shift Details.`,
             resourceType: "Shift",
             resourceId: shift._id,
           });
@@ -303,14 +309,14 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
               ? "Your shift is tomorrow"
               : "Your shift starts in 2 hours",
           message:
-            `Your ${shift.profession} shift starts ${
-              reminder.type === "24_hours"
-                ? "in 24 hours"
-                : "in 2 hours"
+            `Your ${shift.profession} shift at ${facilityName} starts ${
+              reminder.type === "24_hours" ? "in 24 hours" : "in 2 hours"
             }, at ${startTime} WAT. ` +
+            `Location: ${shift.location || "See shift details"}. ` +
+            `Arrival guidance: ${arrivalGuidance}. ` +
             `${workerCount} ${workerLabel} ${
               workerCount === 1 ? "is" : "are"
-            } booked. Please review the shift details before arrival.`,
+            } booked. Check Shift Details.`,
           resourceType: "Shift",
           resourceId: shift._id,
         });

@@ -22,6 +22,7 @@ import shiftAssignmentRoutes from "./routes/shiftAsignmentRoutes.js";
 import applicationRoutes from "./routes/applicationRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
+import feedbackRoutes from "./routes/feedbackRoutes.js";
 
 const PORT = process.env.PORT || 8089;
 
@@ -61,6 +62,7 @@ app.use("/api/assignments/v1", shiftAssignmentRoutes);
 app.use("/api/applications/v1", applicationRoutes);
 app.use("/api/notifications/v1", notificationRoutes);
 app.use("/api/attendance/v1", attendanceRoutes);
+app.use("/api/feedback/v1", feedbackRoutes);
 
 const startServer = async () => {
   try {

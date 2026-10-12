@@ -143,29 +143,6 @@ const completeShift = async (req, res) => {
     }
 };
 
-const confirmShiftCompletion = async (req, res) => {
-    try {
-        const { shiftId } = req.params;
-
-        const shift = await shiftService.confirmShiftCompletion(
-            req.user.id,
-            shiftId
-        );
-
-        res.status(200).json({
-            success: true,
-            message: "Shift completion confirmed successfully.",
-            data: shift,
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message,
-        });
-    }
-};
-
-
 // deletes shift
 const deleteShift = async (req, res) => {
     try {
@@ -183,4 +160,4 @@ const deleteShift = async (req, res) => {
         });
     }
 };
-export default { createShift, getAllShifts, getShiftById, getShiftsForFacility, updateShift, closeShift, completeShift, confirmShiftCompletion, deleteShift };
+export default { createShift, getAllShifts, getShiftById, getShiftsForFacility, updateShift, closeShift, completeShift, deleteShift };
