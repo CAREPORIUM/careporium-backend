@@ -86,9 +86,14 @@ const registerWorker = async (workerData) => {
         await Worker.deleteOne({ _id: worker._id });
         await User.deleteOne({ _id: user._id });
 
-        throw new Error(
-            'Account could not be created because the verification email could not be sent.'
-        );
+        console.error('Verification email failed:', error.message);
+    console.error('Email error code:', error.code);
+    console.error('Email server response:', error.response);
+
+    throw error;
+        //throw new Error(
+          //  'Account could not be created because the verification email could not be sent.'
+        //);
     }
 
     return {

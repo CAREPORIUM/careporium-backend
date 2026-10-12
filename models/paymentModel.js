@@ -55,8 +55,8 @@ const paymentSchema = new mongoose.Schema(
         // payment provider can be changed without redesigning the model
         provider: {
             type: String,
-            enum: ['mock', 'paystack', 'flutterwave'],
-            default: 'mock',
+            enum: ['mock', 'harrenapay'],
+            default: 'harrenapay',
             required: true
         },
 
@@ -64,6 +64,32 @@ const paymentSchema = new mongoose.Schema(
             type: String,
             sparse: true,
             unique: true
+        },
+
+        // stores HarrenaPay escrow and checkout details
+        providerEscrowId: {
+            type: String,
+            sparse: true
+        },
+
+        checkoutUrl: {
+            type: String,
+            trim: true
+        },
+
+        virtualAccountNumber: {
+            type: String,
+            trim: true
+        },
+
+        bankName: {
+            type: String,
+            trim: true
+        },
+
+        // stores when the provider's funding instructions expire
+        expiresAt: {
+            type: Date
         },
 
         // tracks funding independently from shift completion and payout
@@ -92,6 +118,12 @@ const paymentSchema = new mongoose.Schema(
                 'on_hold'
             ],
             default: 'not_ready'
+        },
+
+        clientPlatform: {
+            type: String,
+            enum: ['web', 'mobile'],
+            default: 'web'
         },
 
         // tracks disputes that prevent payout

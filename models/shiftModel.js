@@ -89,8 +89,14 @@ const shiftSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ["open", "filled", "closed", "completed"],
-            default: "open"
+            enum: [
+                "pending_payment",
+                "open",
+                "filled",
+                "closed",
+                "completed"
+            ],
+            default: "pending_payment"
         },
 
         attendanceQrToken: {
@@ -104,17 +110,6 @@ const shiftSchema = new mongoose.Schema(
         ref: "Worker"
         }],
 
-        status: {
-            type: String,
-            enum: [
-                "pending_payment",
-                "open",
-                "filled",
-                "closed",
-                "completed"
-            ],
-            default: "pending_payment"
-        },
     },
     {
         timestamps: true

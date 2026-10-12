@@ -1,170 +1,577 @@
+import Payment from '../models/paymentModel.js';
+import Shift from '../models/shiftModel.js';
+import User from '../models/userModel.js';
 
-import Payment from "../models/paymentModel.js";
-import Shift from "../models/shiftModel.js";
+// calculate the total shift funding amount
+const calculatePaymentAmounts = (payRate, professionalsNeeded) => {
 
-// CAREPORIUM commission is 10%
-const COMMISSION_RATE_BPS = 1000;
-
-// calculate the funding amount for a shift
-const calculateFundingAmounts = (payRate, professionalsNeeded) => {
-
-    // validate the worker's pay and number of professionals required
+    // validate the payment amounts
     if (
         !Number.isFinite(Number(payRate)) ||
-        Number(payRate) <= 0
-    ) {
-        throw new Error("Pay rate must be greater than zero");
-    }
-
-    if (
+        Number(payRate) <= 0 ||
         !Number.isInteger(Number(professionalsNeeded)) ||
         Number(professionalsNeeded) < 1
     ) {
-        throw new Error("Professionals needed must be at least one");
+        throw new Error(
+            'Pay rate and professionals needed must be valid positive numbers'
+        );
     }
 
     // convert the amount per worker from naira to kobo
-    const payRateKobo = Math.round(Number(payRate) * 100);
-
-    // calculate the total amount required to pay all workers
-    const workerBudgetKobo =
-        payRateKobo * Number(professionalsNeeded);
-
-    if (!Number.isSafeInteger(workerBudgetKobo)) {
-        throw new Error("Shift funding amount is too large");
-    }
+    const workerPayoutAmountKobo =
+        Math.round(Number(payRate) * 100) *
+        Number(professionalsNeeded);
 
     // calculate CAREPORIUM's 10% commission
-    const platformCommissionAmountKobo = Math.round(
-        workerBudgetKobo * COMMISSION_RATE_BPS / 10000
-    );
+    const platformCommissionAmountKobo =
+        Math.round(workerPayoutAmountKobo * 0.10);
 
     // calculate the total amount the facility must fund
-    const totalAmountKobo =
-        workerBudgetKobo + platformCommissionAmountKobo;
+    const amountKobo =
+        workerPayoutAmountKobo + platformCommissionAmountKobo;
 
     return {
-        workerBudgetKobo,
+        workerPayoutAmountKobo,
         platformCommissionAmountKobo,
-        totalAmountKobo
+        amountKobo
     };
 };
 
+// select the payment return URL for the client platform
+const getPaymentReturnUrl = (clientPlatform = 'web') => {
+
+    // validate the client platform
+    if (!['web', 'mobile'].includes(clientPlatform)) {
+        throw new Error('Invalid client platform');
+    }
+
+    // select the return URL for the client platform
+    const returnUrl =
+        clientPlatform === 'mobile'
+            ? process.env.MOBILE_PAYMENT_RETURN_URL
+            : process.env.WEB_PAYMENT_RETURN_URL;
+
+    // validate the payment return URL
+    if (!returnUrl) {
+        throw new Error(
+            'Payment return URL is not configured'
+        );
+    }
+
+    let parsedUrl;
+
+    try {
+        parsedUrl = new URL(returnUrl);
+    } catch {
+        throw new Error(
+            'A valid HTTPS payment return URL must be configured'
+        );
+    }
+
+    if (
+        parsedUrl.protocol !== 'https:' ||
+        !parsedUrl.hostname
+    ) {
+        throw new Error(
+            'A valid HTTPS payment return URL must be configured'
+        );
+    }
+
+    return returnUrl;
+};
+
+// retrieve the configured HarrenaPay base URL
+const getHarrenaPayBaseUrl = () => {
+
+    const baseUrl = (
+        process.env.HARRENAPAY_BASE_URL ||
+        'https://www.harrenapay.com/api/public/v1'
+    ).replace(/\/+$/, '');
+
+    let parsedUrl;
+
+    try {
+        parsedUrl = new URL(baseUrl);
+    } catch {
+        throw new Error('Invalid HarrenaPay base URL');
+    }
+
+    if (
+        !['http:', 'https:'].includes(parsedUrl.protocol) ||
+        !parsedUrl.hostname
+    ) {
+        throw new Error('Invalid HarrenaPay base URL');
+    }
+
+    // return the configured provider base URL
+    return baseUrl;
+};
+
+// initiate escrow funding with HarrenaPay
+const initiateHarrenaPayEscrow = async (
+    payment,
+    facility,
+    returnUrl
+) => {
+
+    const apiKey = process.env.HARRENAPAY_API_KEY;
+
+    const baseUrl = getHarrenaPayBaseUrl();
+
+    if (!apiKey) {
+        throw new Error('HarrenaPay API key is not configured');
+    }
+
+    // validate the payment return URL
+    if (!returnUrl) {
+        throw new Error(
+            'Payment return URL is not configured'
+        );
+    }
+
+    const validatedReturnUrl = new URL(returnUrl);
+
+    if (validatedReturnUrl.protocol !== 'https:') {
+        throw new Error(
+            'A valid HTTPS payment return URL must be configured'
+        );
+    }
+
+    // find the user account belonging to the facility
+    const facilityUser = await User.findById(facility.user)
+        .select('email');
+
+    if (!facilityUser || !facilityUser.email) {
+        throw new Error(
+            'Facility user email could not be found'
+        );
+    }
+
+    // prepare the escrow request
+    const requestBody = {
+        reference: payment.providerReference,
+        amount: payment.amountKobo,
+        currency: 'NGN',
+        customer_email: facilityUser.email,
+        customer_name: facility.facilityName,
+        description: `CAREPORIUM shift funding - ${payment.shift}`,
+        return_url: returnUrl,
+        release_window_hours: 168
+    };
+
+    // create the escrow with HarrenaPay
+    const response = await fetch(
+        `${baseUrl}/escrow/initiate`,
+        {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        }
+    );
+
+    const responseData = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        const error = new Error(
+            responseData.message ||
+            responseData.error ||
+            'Unable to initiate HarrenaPay escrow'
+        );
+
+        error.statusCode = response.status;
+
+        throw error;
+    }
+
+    // save the escrow details returned by HarrenaPay
+    payment.providerEscrowId = responseData.escrow_id;
+    payment.checkoutUrl = responseData.checkout_url;
+
+    payment.virtualAccountNumber =
+        responseData.account_number ||
+        responseData.virtual_account_number;
+
+    payment.bankName = responseData.bank_name;
+
+    payment.expiresAt = responseData.expires_at
+        ? new Date(responseData.expires_at)
+        : undefined;
+
+    // keep the funding status pending until a verified webhook confirms payment
+    payment.fundingStatus = 'pending';
+
+    await payment.save();
+
+    return payment;
+};
 
 // create a pending payment record for a shift
 const createPendingPayment = async ({
     shift,
     facility,
     payRate,
-    professionalsNeeded
+    professionalsNeeded,
+    clientPlatform = 'web'
 }) => {
 
-    // calculate the required funding amount
-    const {
-        workerBudgetKobo,
-        platformCommissionAmountKobo,
-        totalAmountKobo
-    } = calculateFundingAmounts(payRate, professionalsNeeded);
+    const paymentProvider =
+        process.env.PAYMENT_PROVIDER || 'mock';
 
-    // create the payment record linked to the shift
+    if (
+        !['mock', 'harrenapay'].includes(paymentProvider)
+    ) {
+        throw new Error('Unsupported payment provider');
+    }
+
+    // validate the client platform
+    if (!['web', 'mobile'].includes(clientPlatform)) {
+        throw new Error('Invalid client platform');
+    }
+
+    // mock payments must never be used in production
+    if (
+        process.env.NODE_ENV === 'production' &&
+        paymentProvider === 'mock'
+    ) {
+        throw new Error(
+            'Mock payments are disabled in production'
+        );
+    }
+
+    // select and validate the payment return URL for HarrenaPay
+    let returnUrl;
+
+    if (paymentProvider === 'harrenapay') {
+        returnUrl = getPaymentReturnUrl(clientPlatform);
+    }
+
+    // calculate the shift funding amount and platform commission
+    const {
+        workerPayoutAmountKobo,
+        platformCommissionAmountKobo,
+        amountKobo
+    } = calculatePaymentAmounts(
+        payRate,
+        professionalsNeeded
+    );
+
+    // create a unique reference for this shift payment
+    const providerReference =
+        `careporium_shift_${shift._id}`;
+
+    // create the pending payment record
     const payment = await Payment.create({
         shift: shift._id,
         facility: facility._id,
-        amountKobo: totalAmountKobo,
-        currency: "NGN",
-        commissionRateBps: COMMISSION_RATE_BPS,
+        amountKobo,
+        commissionRateBps: 1000,
         platformCommissionAmountKobo,
-        workerPayoutAmountKobo: workerBudgetKobo,
-        provider: process.env.PAYMENT_PROVIDER || "mock",
-        fundingStatus: "pending",
-        completionStatus: "pending",
-        payoutStatus: "not_ready",
-        disputeStatus: "none"
+        workerPayoutAmountKobo,
+        provider: paymentProvider,
+        providerReference,
+        clientPlatform,
+        fundingStatus: 'pending',
+        completionStatus: 'pending',
+        payoutStatus: 'not_ready',
+        disputeStatus: 'none'
     });
+
+    // initiate escrow only when HarrenaPay is selected
+    if (paymentProvider === 'harrenapay') {
+        try {
+            return await initiateHarrenaPayEscrow(
+                payment,
+                facility,
+                returnUrl
+            );
+
+        } catch (error) {
+
+            // preserve the payment record so funding can be retried
+            // the same provider reference must be reused for retries
+            payment.fundingStatus = 'failed';
+
+            await payment.save();
+
+            throw error;
+        }
+    }
 
     return payment;
 };
 
+// retry funding for an existing shift payment
+const retryShiftPayment = async ({ shift, facility }) => {
 
-// simulate a payment result during development only
+    // find the existing payment record for this shift
+    const payment = await Payment.findOne({
+        shift: shift._id,
+        facility: facility._id
+    });
+
+    if (!payment) {
+        throw new Error(
+            'Payment record not found for this shift'
+        );
+    }
+
+    // prevent retrying payment for a shift that is no longer awaiting payment
+    if (shift.status !== 'pending_payment') {
+        throw new Error(
+            'This shift is no longer awaiting payment'
+        );
+    }
+
+    // prevent creating another payment after funding has succeeded
+    if (payment.fundingStatus === 'funded') {
+        return payment;
+    }
+
+    // ensure the retry uses the same payment provider
+    if (payment.provider !== 'harrenapay') {
+        throw new Error(
+            'Payment retry is only available for HarrenaPay payments'
+        );
+    }
+
+    // select the original payment return URL
+    const returnUrl = getPaymentReturnUrl(
+        payment.clientPlatform || 'web'
+    );
+
+    // reuse the existing payment reference when retrying escrow initiation
+    try {
+        payment.fundingStatus = 'pending';
+
+        await payment.save();
+
+        // initiate escrow using the existing payment record and reference
+        return await initiateHarrenaPayEscrow(
+            payment,
+            facility,
+            returnUrl
+        );
+
+    } catch (error) {
+
+        // preserve the payment record so another retry is possible
+        payment.fundingStatus = 'failed';
+
+        await payment.save();
+
+        throw error;
+    }
+};
+
+// simulate payment only while developing locally
 const simulateMockPayment = async (paymentId) => {
 
-    // mock payments must never be used in production
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV === 'production') {
         throw new Error(
-            "Mock payments are disabled in production"
-        );
-    }
-
-    if ((process.env.PAYMENT_PROVIDER || "mock") !== "mock") {
-        throw new Error(
-            "Mock payment simulation is not enabled"
-        );
-    }
-
-    // select success, failure, or pending through environment settings
-    const mockResult = process.env.MOCK_PAYMENT_RESULT || "pending";
-
-    if (!["success", "failed", "pending"].includes(mockResult)) {
-        throw new Error(
-            "MOCK_PAYMENT_RESULT must be success, failed, or pending"
+            'Mock payments are disabled in production'
         );
     }
 
     const payment = await Payment.findById(paymentId);
 
     if (!payment) {
-        throw new Error("Payment record not found");
+        throw new Error('Payment not found');
     }
 
-    // do not process a payment that has already been resolved
-    if (payment.fundingStatus !== "pending") {
-        return payment;
+    if (payment.provider !== 'mock') {
+        throw new Error(
+            'Mock payment simulation cannot be used for this provider'
+        );
     }
 
-    // leave the payment pending while awaiting confirmation
-    if (mockResult === "pending") {
-        return payment;
-    }
-
-    // retrieve the shift linked to the payment
-    const shift = await Shift.findById(payment.shift);
-
-    if (!shift) {
-        throw new Error("Shift linked to this payment was not found");
-    }
-
-    // record a simulated funding failure
-    if (mockResult === "failed") {
-        payment.fundingStatus = "failed";
-
-        await payment.save();
-
-        // keep the shift unpublished
-        shift.status = "pending_payment";
-
-        await shift.save();
-
-        return payment;
-    }
-
-    // mark the payment as funded only in the development simulation
-    payment.fundingStatus = "funded";
+    // mark the mock payment as funded
+    payment.fundingStatus = 'funded';
     payment.fundedAt = new Date();
 
     await payment.save();
 
-    // publish the shift after simulated funding succeeds
-    shift.status = "open";
-
-    await shift.save();
+    // publish the shift only after funding succeeds
+    await Shift.findOneAndUpdate(
+        {
+            _id: payment.shift,
+            status: 'pending_payment'
+        },
+        {
+            status: 'open'
+        }
+    );
 
     return payment;
 };
 
+// retrieve payment status from HarrenaPay
+const getPaymentStatus = async (providerReference) => {
+
+    const payment = await Payment.findOne({
+        providerReference
+    });
+
+    if (!payment) {
+        throw new Error('Payment not found');
+    }
+
+    if (payment.provider !== 'harrenapay') {
+        throw new Error(
+            'Payment status lookup is only available for HarrenaPay payments'
+        );
+    }
+
+    const apiKey = process.env.HARRENAPAY_API_KEY;
+
+    const baseUrl = getHarrenaPayBaseUrl();
+
+    if (!apiKey) {
+        throw new Error('HarrenaPay API key is not configured');
+    }
+
+    // retrieve the escrow status from HarrenaPay
+    const response = await fetch(
+        `${baseUrl}/escrow/${encodeURIComponent(providerReference)}`,
+        {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${apiKey}`
+            }
+        }
+    );
+
+    const responseData = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(
+            responseData.message ||
+            responseData.error ||
+            'Unable to retrieve HarrenaPay payment status'
+        );
+    }
+
+    // return the provider response for server-side verification
+    return responseData;
+};
+
+// process a verified HarrenaPay webhook
+const handleHarrenaPayWebhook = async (event) => {
+
+    const {
+        event: eventType,
+        reference,
+        amount,
+        currency
+    } = event;
+
+    // make sure the webhook contains the required payment details
+    if (!eventType || !reference) {
+        throw new Error('Invalid HarrenaPay webhook payload');
+    }
+
+    // ignore events unrelated to shift funding
+    if (
+        ![
+            'escrow.funded',
+            'payment.success',
+            'payment.failed'
+        ].includes(eventType)
+    ) {
+        return {
+            received: true,
+            processed: false
+        };
+    }
+
+    // find the payment using the provider reference
+    const payment = await Payment.findOne({
+        providerReference: reference,
+        provider: 'harrenapay'
+    });
+
+    if (!payment) {
+        throw new Error('Payment not found for this webhook');
+    }
+
+    // confirm the provider's amount and currency match our payment
+    if (
+        amount == null ||
+        Number(amount) !== payment.amountKobo ||
+        currency !== 'NGN'
+    ) {
+        throw new Error(
+            'Webhook amount or currency does not match the payment'
+        );
+    }
+
+    // do not process a payment failure after funding is confirmed
+    if (
+        eventType === 'payment.failed' &&
+        payment.fundingStatus === 'funded'
+    ) {
+        return {
+            received: true,
+            processed: false
+        };
+    }
+
+    // handle a confirmed funding event
+    if (
+        eventType === 'escrow.funded' ||
+        eventType === 'payment.success'
+    ) {
+
+        // avoid processing the same funding event more than once
+        if (payment.fundingStatus === 'funded') {
+            return {
+                received: true,
+                processed: true
+            };
+        }
+
+        payment.fundingStatus = 'funded';
+        payment.fundedAt = new Date();
+
+        await payment.save();
+
+        // publish the shift only after funding is confirmed
+        await Shift.findOneAndUpdate(
+            {
+                _id: payment.shift,
+                status: 'pending_payment'
+            },
+            {
+                status: 'open'
+            }
+        );
+
+        return {
+            received: true,
+            processed: true
+        };
+    }
+
+    // record a failed funding attempt without deleting the shift
+    if (eventType === 'payment.failed') {
+
+        payment.fundingStatus = 'failed';
+
+        await payment.save();
+
+        return {
+            received: true,
+            processed: true
+        };
+    }
+};
 
 export default {
-    calculateFundingAmounts,
     createPendingPayment,
-    simulateMockPayment
+    retryShiftPayment,
+    simulateMockPayment,
+    getPaymentStatus,
+    handleHarrenaPayWebhook
 };

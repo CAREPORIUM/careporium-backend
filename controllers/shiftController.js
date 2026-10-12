@@ -1,21 +1,32 @@
 import shiftService from "../services/shiftService.js";
 
-// create shift
+// receives the create shift request
 const createShift = async (req, res) => {
+
     try {
 
-        const shift = await shiftService.createShift(
-            req.user.id, 
-            req.body);
+        // extract the client platform and shift details
+        const { clientPlatform, ...shiftData } = req.body;
 
-        res.status(201).json({
+        // create the shift under the facility's profile
+        const shift = await shiftService.createShift(
+            req.user.id,
+            shiftData,
+            clientPlatform
+        );
+
+        return res.status(201).json({
             message: "Shift created successfully",
             data: shift
         });
+
     } catch (error) {
-        res.status(400).json({
-            message: error.message
+
+        return res.status(400).json({
+            message: error.message,
+            shiftId: error.shiftId
         });
+
     }
 };
 
@@ -78,11 +89,12 @@ const getShiftsForFacility = async(req, res) =>{
 // facility updates shift
 const updateShift = async (req, res) => {
     try {
-        const userId = req.user.id
-        const { shiftId } = req.params
+        const userId = req.user.id;
+        const { shiftId } = req.params;
+
         const shift = await shiftService.updateShift(
-            req.user.id,
-            req.params.id,
+            userId,
+            shiftId,
             req.body
         );
 
@@ -95,7 +107,7 @@ const updateShift = async (req, res) => {
             message: error.message
         });
     }
-}
+};
 
 // close a shift
 const closeShift = async(req, res) => {
@@ -146,9 +158,9 @@ const completeShift = async (req, res) => {
 // deletes shift
 const deleteShift = async (req, res) => {
     try {
-        await deleteShift(
+        await shiftService.deleteShift(
             req.user.id,
-            req.params.id
+            req.params.shiftId
         );
 
         res.status(200).json({
@@ -160,4 +172,5 @@ const deleteShift = async (req, res) => {
         });
     }
 };
+
 export default { createShift, getAllShifts, getShiftById, getShiftsForFacility, updateShift, closeShift, completeShift, deleteShift };

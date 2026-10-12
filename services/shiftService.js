@@ -1,9 +1,30 @@
 import Shift from "../models/shiftModel.js";
 import Facility from "../models/facilityModel.js";
-import Attendance from "../models/attendanceModel.js"
+import Attendance from "../models/attendanceModel.js";
+import Payment from "../models/paymentModel.js";
+import paymentService from "./paymentService.js";
 
 // create a new shift under a facility's profile
-const createShift = async (userId, shiftData) => {
+const createShift = async (userId, shiftData, clientPlatform = "web") => {
+
+    // mock payments must never be used in production
+    const paymentProvider = process.env.PAYMENT_PROVIDER || "mock";
+
+    if (
+        process.env.NODE_ENV === "production" &&
+        paymentProvider === "mock"
+    ) {
+        throw new Error(
+            "Mock payments are disabled in production"
+        );
+    }
+
+    // validate the client platform
+    if (!["web", "mobile"].includes(clientPlatform)) {
+        throw new Error("Invalid client platform");
+    }
+
+    // find the facility belonging to the logged-in user
     const facility = await Facility.findOne({
         user: userId
     });
@@ -12,56 +33,93 @@ const createShift = async (userId, shiftData) => {
         throw new Error("Facility not found for this user");
     }
 
+    // create the shift as unpublished until payment is verified
     const shift = await Shift.create({
-
-    facility: facility._id,
-    profession: shiftData.profession,
-    specialty: shiftData.specialty,
-    shiftDate: shiftData.shiftDate,
-    shiftType: shiftData.shiftType,
-    startTime: shiftData.startTime,
-    endTime: shiftData.endTime,
-    professionalsNeeded: shiftData.professionalsNeeded,
-    minimumExperience: shiftData.minimumExperience,
-    location: shiftData.location,
-    responsibilities: shiftData.responsibilities,
-    reqCredentials: shiftData.reqCredentials,
-    arrivalInstructions: shiftData.arrivalInstructions,
-    payRate: shiftData.payRate,
-    isUrgent: shiftData.isUrgent,
+        facility: facility._id,
+        profession: shiftData.profession,
+        specialty: shiftData.specialty,
+        shiftDate: shiftData.shiftDate,
+        shiftType: shiftData.shiftType,
+        startTime: shiftData.startTime,
+        endTime: shiftData.endTime,
+        professionalsNeeded: shiftData.professionalsNeeded,
+        minimumExperience: shiftData.minimumExperience,
+        location: shiftData.location,
+        responsibilities: shiftData.responsibilities,
+        reqCredentials: shiftData.reqCredentials,
+        arrivalInstructions: shiftData.arrivalInstructions,
+        payRate: shiftData.payRate,
+        isUrgent: shiftData.isUrgent,
+        status: "pending_payment"
     });
 
-    return shift;
+    try {
+
+        // create a pending payment and initiate funding
+        const payment = await paymentService.createPendingPayment({
+            shift,
+            facility,
+            payRate: shift.payRate,
+            professionalsNeeded: shift.professionalsNeeded,
+            clientPlatform
+        });
+
+        // simulate payment only while developing locally
+        if (paymentProvider === "mock") {
+
+            const fundedPayment =
+                await paymentService.simulateMockPayment(payment._id);
+
+            // return the funded payment and updated shift
+            return {
+                shift: await Shift.findById(shift._id),
+                payment: fundedPayment
+            };
+        }
+
+        // keep the shift unpublished until HarrenaPay confirms funding
+        return {
+            shift,
+            payment
+        };
+
+    } catch (error) {
+
+        // preserve the unpublished shift so payment can be retried
+        error.shiftId = shift._id;
+
+        throw error;
+    }
 };
 
 // get all available shifts
 const getAllShifts = async () => {
 
-    const shifts = await Shift.find({status: "open"})
-    .populate({
-        path: "facility", 
-        select: "facilityName facilityType location",
+    const shifts = await Shift.find({
+        status: "open"
+    }).populate({
+        path: "facility",
+        select: "facilityName facilityType location"
     });
 
     return shifts;
 };
 
-
-//get a single shift by its ID
+// get a single shift by its ID
 const getShiftById = async (userId, role, shiftId) => {
 
-    //find the shift
+    // find the shift
     const shift = await Shift.findById(shiftId)
         .populate({
             path: "facility",
-            select: "facilityName facilityType location",
+            select: "facilityName facilityType location"
         });
 
     if (!shift) {
         throw new Error("Shift not found");
     }
 
-    //facility can only view shifts belonging to their facility
+    // facility can only view shifts belonging to their facility
     if (role === "facility") {
 
         const facility = await Facility.findOne({
@@ -80,27 +138,31 @@ const getShiftById = async (userId, role, shiftId) => {
                 "You are not authorized to view this shift"
             );
         }
-        //facility can see assigned workers
+
+        // facility can see assigned workers
         await shift.populate({
             path: "assignedWorkers",
-            select: "fullName profession specialty yearsOfExperience",
+            select: "fullName profession specialty yearsOfExperience"
         });
+
         return shift;
     }
-    //admin can view the shift and assigned workers
+
+    // admin can view the shift and assigned workers
     if (role === "admin") {
 
         await shift.populate({
             path: "assignedWorkers",
-            select: "fullName profession specialty yearsOfExperience",
+            select: "fullName profession specialty yearsOfExperience"
         });
 
         return shift;
     }
-    //worker can view the shift without seeing assigned workers
+
+    // worker can view the shift without seeing assigned workers
     if (role === "worker") {
 
-        //remove sensitive fields from the response
+        // remove sensitive fields from the response
         const shiftData = shift.toObject();
 
         delete shiftData.assignedWorkers;
@@ -108,72 +170,89 @@ const getShiftById = async (userId, role, shiftId) => {
 
         return shiftData;
     }
+
     throw new Error("You are not authorized to view this shift");
 };
 
 // get all shifts belonging to a facility by the facility's user ID
 const getShiftsForFacility = async (userId) => {
+
     // find the facility associated with the user
-    const facility = await Facility.findOne({
-        user: userId
-    })
-
-    if(!facility){
-        throw new Error("Facility not found for this user")
-    }
-
-    const shifts = await Shift.find({
-        facility: facility._id,
-        }).populate({
-            path: 'assignedWorkers',
-            select: 'fullname profession specialty yearsOfExperience',
-        })
-
-        return shifts;
-}
-
-// update a shift by facility
-const updateShift = async (userId, shiftId, shiftData) => {
     const facility = await Facility.findOne({
         user: userId
     });
 
     if (!facility) {
-        throw new Error("Facility not found for this user")
+        throw new Error("Facility not found for this user");
+    }
+
+    const shifts = await Shift.find({
+        facility: facility._id
+    }).populate({
+        path: "assignedWorkers",
+        select: "fullName profession specialty yearsOfExperience"
+    });
+
+    return shifts;
+};
+
+// update a shift by facility
+const updateShift = async (userId, shiftId, shiftData) => {
+
+    const facility = await Facility.findOne({
+        user: userId
+    });
+
+    if (!facility) {
+        throw new Error("Facility not found for this user");
     }
 
     // find the shift belonging to the facility
-    const shift = await Shift.findOne({ 
+    const shift = await Shift.findOne({
         _id: shiftId,
         facility: facility._id
-    })
+    });
 
     if (!shift) {
-        throw new Error("Shift not found or you are not authorized to update this shift");
+        throw new Error(
+            "Shift not found or you are not authorized to update this shift"
+        );
+    }
+
+    // don't allow unpublished shifts to be edited through the regular update route
+    if (shift.status === "pending_payment") {
+        throw new Error(
+            "This shift cannot be updated until payment has been confirmed"
+        );
+    }
+
+    // don't allow completed or closed shifts to be edited
+    if (["completed", "closed"].includes(shift.status)) {
+        throw new Error(
+            "Completed or closed shifts cannot be updated"
+        );
     }
 
     // don't allow professionals needed to be changed
     // once all required workers have been assigned
-
     if (
-        updateData.professionalsNeeded !== undefined &&
+        shiftData.professionalsNeeded !== undefined &&
         shift.assignedWorkers.length >= shift.professionalsNeeded
     ) {
-
-        throw new Error( "Professionals needed cannot be changed because all required workers have already been assigned.")
+        throw new Error(
+            "Professionals needed cannot be changed because all required workers have already been assigned."
+        );
     }
 
     // don't allow professionals needed to be reduced
     // below the number of workers already assigned
-
     if (
-        updateData.professionalsNeeded !== undefined &&
-        updateData.professionalsNeeded < shift.assignedWorkers.length) {
-        throw new Error("Professionals needed cannot be less than the number of workers already assigned.")
-    }
-
-    if (shift.facility.toString() !== facility._id.toString()) {
-        throw new Error("You are not authorized to update this shift");
+        shiftData.professionalsNeeded !== undefined &&
+        shiftData.professionalsNeeded < shift.assignedWorkers.length
+    ) {
+        throw new Error(
+            "Professionals needed cannot be less than the number of workers already assigned."
+        );
     }
 
     // update the shift fields with the provided data
@@ -198,15 +277,15 @@ const updateShift = async (userId, shiftId, shiftData) => {
         if (shiftData[field] !== undefined) {
             shift[field] = shiftData[field];
         }
-    })
+    });
 
     // check if the shift still needs more workers
-    if (shift.assignedWorkers.length < shift.professionalsNeeded){
-        shift.status = 'open'
+    if (shift.assignedWorkers.length < shift.professionalsNeeded) {
+        shift.status = "open";
     }
 
     if (shift.assignedWorkers.length >= shift.professionalsNeeded) {
-        shift.status = 'filled'
+        shift.status = "filled";
     }
 
     await shift.save();
@@ -215,7 +294,8 @@ const updateShift = async (userId, shiftId, shiftData) => {
 };
 
 // close a shift by facility
-const closeShift= async (userId, shiftId) => {
+const closeShift = async (userId, shiftId) => {
+
     const facility = await Facility.findOne({
         user: userId
     });
@@ -224,13 +304,33 @@ const closeShift= async (userId, shiftId) => {
         throw new Error("Facility not found for this user");
     }
 
-    const shift = await Shift.findOne({_id: shiftId, facility: facility._id });
+    const shift = await Shift.findOne({
+        _id: shiftId,
+        facility: facility._id
+    });
 
     if (!shift) {
-        throw new Error("Shift not found or you are not authorized to close this shift");
+        throw new Error(
+            "Shift not found or you are not authorized to close this shift"
+        );
     }
 
-    shift.status = 'closed';
+    // don't allow a shift awaiting payment to be closed through this route
+    if (shift.status === "pending_payment") {
+        throw new Error(
+            "This shift cannot be closed while payment is pending"
+        );
+    }
+
+    // don't allow completed shifts to be closed again
+    if (shift.status === "completed") {
+        throw new Error(
+            "A completed shift cannot be closed"
+        );
+    }
+
+    shift.status = "closed";
+
     await shift.save();
 
     return shift;
@@ -289,6 +389,7 @@ const completeShift = async (userId, shiftId) => {
             "All assigned workers must have attendance records before the shift can be completed"
         );
     }
+
     // make sure every assigned worker has clocked out
     const workerStillWorking = attendanceRecords.some(
         (attendance) => !attendance.clockOutTime
@@ -299,6 +400,7 @@ const completeShift = async (userId, shiftId) => {
             "All assigned workers must clock out before the shift can be completed"
         );
     }
+
     // mark the shift as completed
     shift.status = "completed";
 
@@ -309,6 +411,8 @@ const completeShift = async (userId, shiftId) => {
 
 // delete a shift by facility
 const deleteShift = async (userId, shiftId) => {
+
+    // find the facility belonging to the logged-in user
     const facility = await Facility.findOne({
         user: userId
     });
@@ -317,10 +421,43 @@ const deleteShift = async (userId, shiftId) => {
         throw new Error("Facility profile not found");
     }
 
-    const shift = await Shift.findOne({_id: shiftId, facility: facility._id });
+    // find the shift belonging to the facility
+    const shift = await Shift.findOne({
+        _id: shiftId,
+        facility: facility._id
+    });
 
     if (!shift) {
-        throw new Error("Shift not found or you are not authorized to delete this shift");
+        throw new Error(
+            "Shift not found or you are not authorized to delete this shift"
+        );
+    }
+
+    // don't allow deletion of a shift with assigned workers
+    if (shift.assignedWorkers.length > 0) {
+        throw new Error(
+            "A shift with assigned workers cannot be deleted"
+        );
+    }
+
+    // find the payment record associated with this shift
+    const payment = await Payment.findOne({
+        shift: shift._id,
+        facility: facility._id
+    });
+
+    // don't allow deletion when a payment record exists
+    if (payment) {
+        throw new Error(
+            "This shift has a payment record and cannot be deleted. Use a payment cancellation or refund process instead."
+        );
+    }
+
+    // only allow deletion of unpublished or closed shifts
+    if (!["pending_payment", "closed"].includes(shift.status)) {
+        throw new Error(
+            "Only shifts awaiting payment or closed shifts can be deleted"
+        );
     }
 
     await shift.deleteOne();
@@ -328,4 +465,13 @@ const deleteShift = async (userId, shiftId) => {
     return shift;
 };
 
-export default { createShift, getAllShifts, getShiftById, getShiftsForFacility, updateShift, deleteShift, closeShift, completeShift }
+export default {
+    createShift,
+    getAllShifts,
+    getShiftById,
+    getShiftsForFacility,
+    updateShift,
+    deleteShift,
+    closeShift,
+    completeShift
+};

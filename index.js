@@ -13,6 +13,7 @@ import applicationRoutes from "./routes/applicationRoutes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./config/swagger.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 connectDB();
 
@@ -29,6 +30,9 @@ app.get("/swagger-test", (req, res) => {
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use(cors());
+
+app.use("/api/payments/v1", paymentRoutes);
+
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -51,6 +55,7 @@ app.use("/api/shifts/v1", shiftRoutes);
 app.use("/api/applications/v1", applicationRoutes);
 app.use("/api/admin/v1", adminRoutes);
 app.use("/api/attendance/v1", attendanceRoutes);
+
 
 
 
