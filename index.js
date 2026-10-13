@@ -26,6 +26,7 @@ const app = express();
 const allowedOrigins = [
     process.env.FRONTEND_LOCAL_URL,
     process.env.FRONTEND_PROD_URL,
+    'http://127.0.0.1.5500',
     'http://localhost:8089',
     'https://careporium-backend.onrender.com'
 ].filter(Boolean);

@@ -331,9 +331,7 @@ const resendVerificationOtp = async (email) => {
         text: `Your new Careporium verification code is ${otp}. It expires in 5 minutes.`
     });
 
-    return {
-        message: 'A new verification code has been sent to your email'
-    };
+    return;
 };
 
 

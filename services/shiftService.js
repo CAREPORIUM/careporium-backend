@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Shift from "../models/shiftModel.js";
 import Facility from "../models/facilityModel.js";
 import Attendance from "../models/attendanceModel.js";
@@ -336,77 +337,154 @@ const closeShift = async (userId, shiftId) => {
     return shift;
 };
 
-// complete a shift by facility
+// handles completion of a shift after all assigned workers have clocked out
 const completeShift = async (userId, shiftId) => {
 
-    // find the facility belonging to the logged-in user
-    const facility = await Facility.findOne({
-        user: userId
-    });
+    const session = await mongoose.startSession();
 
-    if (!facility) {
-        throw new Error("Facility not found for this user");
+    try {
+
+        let result;
+
+        await session.withTransaction(async () => {
+
+            const facility = await Facility.findOne({
+                user: userId
+            }).session(session);
+
+            if (!facility) {
+                throw new Error("Facility profile not found");
+            }
+
+            const shift = await Shift.findOne({
+                _id: shiftId,
+                facility: facility._id
+            }).session(session);
+
+            if (!shift) {
+                throw new Error("Shift not found or you do not have permission to complete it");
+            }
+
+            // allow safe retries when completion has already succeeded
+            const payment = await Payment.findOne({
+                shift: shift._id,
+                facility: facility._id
+            }).session(session);
+
+            if (!payment) {
+                throw new Error("Payment record not found for this shift");
+            }
+
+            if (
+                shift.status === "completed" &&
+                payment.completionStatus === "confirmed"
+            ) {
+                result = { shift, payment };
+                return;
+            }
+
+            // ensure the shift has been filled before completion
+            if (shift.status !== "filled") {
+                throw new Error("Only filled shifts can be completed");
+            }
+
+            // ensure there are assigned workers
+            if (!shift.assignedWorkers || shift.assignedWorkers.length === 0) {
+                throw new Error("Cannot complete a shift without assigned workers");
+            }
+
+            // ensure all required positions have been filled
+            if (shift.assignedWorkers.length !== shift.professionalsNeeded) {
+                throw new Error(
+                    "The number of assigned workers does not match the required number of professionals"
+                );
+            }
+
+            // ensure payment has been confirmed before completing the shift
+            if (payment.fundingStatus !== "funded") {
+                throw new Error("Shift payment has not been funded");
+            }
+
+            // prevent completion when a dispute is open
+            if (payment.disputeStatus === "open") {
+                throw new Error("Cannot confirm shift completion while a dispute is open");
+            }
+
+            // ensure all assigned workers have attendance records
+            const attendanceRecords = await Attendance.find({
+                shift: shift._id,
+                worker: { $in: shift.assignedWorkers }
+            }).session(session);
+
+            if (attendanceRecords.length !== shift.assignedWorkers.length) {
+                throw new Error("All assigned workers must have attendance records before completion");
+            }
+
+            // ensure every assigned worker has clocked out
+            const allWorkersClockedOut = attendanceRecords.every(
+                (attendance) => attendance.clockOutTime
+            );
+
+            if (!allWorkersClockedOut) {
+                throw new Error("All assigned workers must clock out before completion");
+            }
+
+            // validate the total worker payout amount
+            const totalWorkerPayoutKobo = payment.workerPayoutAmountKobo;
+            const numberOfWorkers = shift.assignedWorkers.length;
+
+            if (
+                !Number.isSafeInteger(totalWorkerPayoutKobo) ||
+                totalWorkerPayoutKobo < numberOfWorkers
+            ) {
+                throw new Error("Invalid worker payout amount");
+            }
+
+            // divide the total worker payout fairly, including any remaining kobo
+            const basePayoutKobo = Math.floor(
+                totalWorkerPayoutKobo / numberOfWorkers
+            );
+
+            let remainingKobo = totalWorkerPayoutKobo % numberOfWorkers;
+
+            // prepare individual payout records for each assigned worker
+            payment.workerPayouts = shift.assignedWorkers.map((workerId) => {
+                const amountKobo =
+                    basePayoutKobo + (remainingKobo > 0 ? 1 : 0);
+
+                if (remainingKobo > 0) {
+                    remainingKobo--;
+                }
+
+                return {
+                    worker: workerId,
+                    amountKobo,
+                    status: "not_ready"
+                };
+            });
+
+            // update payment completion status after facility confirmation
+            payment.completionStatus = "confirmed";
+            payment.completionConfirmedAt = new Date();
+
+            // keep payouts unavailable until the provider transfer process is implemented
+            payment.payoutStatus = "not_ready";
+
+            await payment.save({ session });
+
+            // mark the shift as completed
+            shift.status = "completed";
+
+            await shift.save({ session });
+
+            result = { shift, payment };
+        });
+
+        return result;
+
+    } finally {
+        await session.endSession();
     }
-
-    // find the shift belonging to the facility
-    const shift = await Shift.findOne({
-        _id: shiftId,
-        facility: facility._id
-    });
-
-    if (!shift) {
-        throw new Error(
-            "Shift not found or you are not authorized to complete this shift"
-        );
-    }
-
-    // the shift must be filled before it can be completed
-    if (shift.status !== "filled") {
-        throw new Error(
-            "Only a filled shift can be completed"
-        );
-    }
-
-    // make sure there are assigned workers
-    if (shift.assignedWorkers.length === 0) {
-        throw new Error(
-            "This shift has no assigned workers"
-        );
-    }
-
-    // find all attendance records for the assigned workers
-    const attendanceRecords = await Attendance.find({
-        shift: shift._id,
-        worker: { $in: shift.assignedWorkers }
-    });
-
-    // make sure every assigned worker has an attendance record
-    if (
-        attendanceRecords.length !==
-        shift.assignedWorkers.length
-    ) {
-        throw new Error(
-            "All assigned workers must have attendance records before the shift can be completed"
-        );
-    }
-
-    // make sure every assigned worker has clocked out
-    const workerStillWorking = attendanceRecords.some(
-        (attendance) => !attendance.clockOutTime
-    );
-
-    if (workerStillWorking) {
-        throw new Error(
-            "All assigned workers must clock out before the shift can be completed"
-        );
-    }
-
-    // mark the shift as completed
-    shift.status = "completed";
-
-    await shift.save();
-
-    return shift;
 };
 
 // delete a shift by facility

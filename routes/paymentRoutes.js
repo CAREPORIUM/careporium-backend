@@ -19,4 +19,16 @@ router.post(
     paymentController.retryShiftPayment
 );
 
+router.get(
+    '/history',
+    authMiddleware,
+    paymentController.getPaymentHistory
+);
+
+router.get(
+    '/shift/:shiftId',
+    authMiddleware,
+    paymentController.getShiftPaymentStatus
+);
+
 export default router;

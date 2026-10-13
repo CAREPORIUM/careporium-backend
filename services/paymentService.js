@@ -457,7 +457,7 @@ const getPaymentStatus = async (providerReference) => {
     return responseData;
 };
 
-// process a verified HarrenaPay webhook
+// handles HarrenaPay webhook events
 const handleHarrenaPayWebhook = async (event) => {
 
     const {
@@ -467,84 +467,81 @@ const handleHarrenaPayWebhook = async (event) => {
         currency
     } = event;
 
-    // make sure the webhook contains the required payment details
     if (!eventType || !reference) {
         throw new Error('Invalid HarrenaPay webhook payload');
     }
 
-    // ignore events unrelated to shift funding
-    if (
-        ![
-            'escrow.funded',
-            'payment.success',
-            'payment.failed'
-        ].includes(eventType)
-    ) {
+    const supportedEvents = [
+        'escrow.funded',
+        'payment.success',
+        'payment.failed',
+        'escrow.accepted',
+        'escrow.declined',
+        'escrow.delivered',
+        'escrow.released',
+        'escrow.refunded',
+        'dispute.opened'
+    ];
+
+    if (!supportedEvents.includes(eventType)) {
         return {
             received: true,
             processed: false
         };
     }
 
-    // find the payment using the provider reference
     const payment = await Payment.findOne({
         providerReference: reference,
         provider: 'harrenapay'
     });
 
     if (!payment) {
-        throw new Error('Payment not found for this webhook');
+        throw new Error('Payment record not found for webhook reference');
     }
 
-    // confirm the provider's amount and currency match our payment
-    if (
-        amount == null ||
-        Number(amount) !== payment.amountKobo ||
-        currency !== 'NGN'
-    ) {
-        throw new Error(
-            'Webhook amount or currency does not match the payment'
-        );
+    // validate monetary details when the provider includes them
+    if (amount !== undefined && Number(amount) !== payment.amountKobo) {
+        throw new Error('Webhook amount does not match payment record');
     }
 
-    // do not process a payment failure after funding is confirmed
-    if (
-        eventType === 'payment.failed' &&
-        payment.fundingStatus === 'funded'
-    ) {
-        return {
-            received: true,
-            processed: false
-        };
+    if (currency !== undefined && currency !== payment.currency) {
+        throw new Error('Webhook currency does not match payment record');
     }
 
-    // handle a confirmed funding event
+    // handle successful funding
     if (
         eventType === 'escrow.funded' ||
         eventType === 'payment.success'
     ) {
 
-        // avoid processing the same funding event more than once
-        if (payment.fundingStatus === 'funded') {
+        if (
+            payment.fundingStatus === 'refunded' ||
+            payment.fundingStatus === 'failed'
+        ) {
             return {
                 received: true,
-                processed: true
+                processed: false
             };
         }
 
-        payment.fundingStatus = 'funded';
-        payment.fundedAt = new Date();
+        if (payment.fundingStatus !== 'funded') {
+            payment.fundingStatus = 'funded';
+            payment.fundedAt = new Date();
+        }
+
+        payment.providerEscrowStatus = 'funded';
 
         await payment.save();
 
-        // publish the shift only after funding is confirmed
         await Shift.findOneAndUpdate(
             {
                 _id: payment.shift,
                 status: 'pending_payment'
             },
             {
-                status: 'open'
+                $set: {
+                    status: 'open'
+                }
             }
         );
 
@@ -554,10 +551,21 @@ const handleHarrenaPayWebhook = async (event) => {
         };
     }
 
-    // record a failed funding attempt without deleting the shift
+    // handle failed funding
     if (eventType === 'payment.failed') {
 
+        if (
+            payment.fundingStatus === 'funded' ||
+            payment.fundingStatus === 'refunded'
+        ) {
+            return {
+                received: true,
+                processed: false
+            };
+        }
+
         payment.fundingStatus = 'failed';
+        payment.providerEscrowStatus = 'failed';
 
         await payment.save();
 
@@ -566,6 +574,48 @@ const handleHarrenaPayWebhook = async (event) => {
             processed: true
         };
     }
+
+    // handle seller acceptance
+    if (eventType === 'escrow.accepted') {
+        payment.providerEscrowStatus = 'accepted';
+    }
+
+    // handle delivery confirmation at provider level
+    if (eventType === 'escrow.delivered') {
+        payment.providerEscrowStatus = 'delivered';
+    }
+
+    // provider releasing escrow does not by itself confirm worker payout
+    if (eventType === 'escrow.released') {
+        payment.providerEscrowStatus = 'released';
+    }
+
+    // handle provider refund
+    if (eventType === 'escrow.refunded') {
+        payment.providerEscrowStatus = 'refunded';
+        payment.fundingStatus = 'refunded';
+        payment.payoutStatus = 'on_hold';
+    }
+
+    // handle disputes
+    if (eventType === 'dispute.opened') {
+        payment.providerEscrowStatus = 'disputed';
+        payment.disputeStatus = 'open';
+        payment.payoutStatus = 'on_hold';
+    }
+
+    // handle seller declining an escrow invitation
+    if (eventType === 'escrow.declined') {
+        payment.providerEscrowStatus = 'declined';
+        payment.payoutStatus = 'on_hold';
+    }
+
+    await payment.save();
+
+    return {
+        received: true,
+        processed: true
+    };
 };
 
 export default {

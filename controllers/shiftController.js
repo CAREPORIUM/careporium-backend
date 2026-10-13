@@ -136,15 +136,18 @@ const completeShift = async (req, res) => {
 
         const { shiftId } = req.params;
 
-        const shift = await shiftService.completeShift(
+        const result = await shiftService.completeShift(
             req.user.id,
             shiftId
         );
 
         res.status(200).json({
             success: true,
-            message: "Shift completed successfully.",
-            data: shift
+            message: "Shift completed and payment confirmation recorded successfully.",
+            data: {
+                shift: result.shift,
+                payment: result.payment
+            }
         });
 
     } catch (error) {

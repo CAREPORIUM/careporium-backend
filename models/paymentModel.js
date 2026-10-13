@@ -52,6 +52,50 @@ const paymentSchema = new mongoose.Schema(
             min: 0
         },
 
+                // tracks each worker's individual payout for the shift
+        workerPayouts: [
+            {
+                worker: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'Worker',
+                    required: true
+                },
+
+                amountKobo: {
+                    type: Number,
+                    required: true,
+                    min: 1
+                },
+
+                status: {
+                    type: String,
+                    enum: [
+                        'not_ready',
+                        'pending',
+                        'processing',
+                        'paid',
+                        'failed',
+                        'on_hold'
+                    ],
+                    default: 'not_ready'
+                },
+
+                payoutReference: {
+                    type: String,
+                    trim: true
+                },
+
+                paidAt: {
+                    type: Date
+                },
+
+                failureReason: {
+                    type: String,
+                    trim: true
+                }
+            }
+        ],
+
         // payment provider can be changed without redesigning the model
         provider: {
             type: String,
@@ -70,6 +114,24 @@ const paymentSchema = new mongoose.Schema(
         providerEscrowId: {
             type: String,
             sparse: true
+        },
+
+                // tracks HarrenaPay's escrow status separately from worker payouts
+        providerEscrowStatus: {
+            type: String,
+            enum: [
+                'pending',
+                'awaiting_payment',
+                'funded',
+                'accepted',
+                'delivered',
+                'released',
+                'refunded',
+                'declined',
+                'disputed',
+                'failed'
+            ],
+            default: 'pending'
         },
 
         checkoutUrl: {

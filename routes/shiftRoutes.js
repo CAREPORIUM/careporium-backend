@@ -13,6 +13,6 @@ router.get("/get-facility-shifts", authMiddleware, requireRole("facility"), shif
 router.put("/update-shift/:shiftId", authMiddleware, requireRole("facility"), shiftController.updateShift)
 router.patch("/close-shift/:shiftId", authMiddleware, requireRole("facility"), shiftController.closeShift)
 router.patch("/complete-shift/:shiftId", authMiddleware, requireRole("facility"), shiftController.completeShift)
-router.delete("/delete-shift/:id", authMiddleware, requireRole("facility"), shiftController.deleteShift);
+router.delete("/delete-shift/:shiftId", authMiddleware, requireRole("facility"), shiftController.deleteShift);
 
 export default router;
