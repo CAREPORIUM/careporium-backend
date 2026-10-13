@@ -492,22 +492,29 @@ const getProfile = async (userId) => {
 };
 
 // forgot password
-const forgotPassword = async(email) => {
+const forgotPassword = async (email) => {
+    if (!email) {
+        throw new Error('Email is required');
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
     const user = await User.findOne({
-      email: email.trim().toLowerCase()
-    })
+        email: normalizedEmail
+    });
+
     // a generic response to prevent the service from
     // revealing if an email address is registered or not
     const response = {
-      message: 'If an account with the email exists, a password reset code has been sent'
-    }
+        message: 'If an account with the email exists, a password reset code has been sent'
+    };
 
-    if(!user) {
-      return response
+    if (!user) {
+        return response;
     }
 
     // generate a secure 6-digit OTP
-    const otp = randomInt(100000, 1000000).toString()
+    const otp = randomInt(100000, 1000000).toString();
 
     // hash the OTP before saving it
     user.resetPasswordOtp = createHash('sha256')
@@ -517,91 +524,236 @@ const forgotPassword = async(email) => {
     // OTP expires in 10 minutes
     user.resetPasswordOtpExpires = new Date(
         Date.now() + 10 * 60 * 1000
-    )
+    );
 
-    await user.save()
+    // record when the code was last sent
+    user.resetPasswordOtpLastSentAt = new Date();
+
+    // require verification of the new code
+    user.resetPasswordOtpVerified = false;
+
+    await user.save();
 
     // send password reset OTP
-    try{
-      await transporter.sendMail({
-        from: `"Careporium" <${process.env.EMAIL_FROM}>`,
-        to: user.email,
-        subject: 'Reset Your Careporium Account Password',
-        text: `Your Careporium password reset code is ${otp}. It expires in 10 minutes. If you did not request this, you can ignore this email.`
-      })
-    }catch (emailError) {
+    try {
+        await transporter.sendMail({
+            from: `"Careporium" <${process.env.EMAIL_FROM}>`,
+            to: user.email,
+            subject: 'Reset Your Careporium Account Password',
+            text: `Your Careporium password reset code is ${otp}. It expires in 10 minutes. If you did not request this, you can ignore this email.`
+        });
+    } catch (emailError) {
+        // clear reset details if the email could not be sent
+        user.resetPasswordOtp = undefined;
+        user.resetPasswordOtpExpires = undefined;
+        user.resetPasswordOtpLastSentAt = undefined;
+        user.resetPasswordOtpVerified = false;
 
-      //console.error("Password reset email error:", emailError)
-      user.resetPasswordOtp = undefined
-      user.resetPasswordOtpExpires = undefined
+        await user.save();
 
-      await user.save()
-
-      throw new Error(
-        'Unable to send the password reset email. Please try again'
-      )
+        throw new Error(
+            'Unable to send the password reset email. Please try again'
+        );
     }
-    return response
-  }
 
-// reset password
-const resetPassword = async(email, otp, newPassword) => {
-    if (!email || !otp || !newPassword) {
-      throw new Error(
-        'Email, OTP and new password are required'
-      )
-    }
-    if (newPassword.length < 8) {
-      throw new Error(
-      'Password must be at least 8 characters long'
-      )
+    return response;
+};
+
+
+// verify password reset OTP
+const verifyResetCode = async (email, otp) => {
+    if (!email || !otp) {
+        throw new Error('Email and OTP are required');
     }
 
     const user = await User.findOne({
-      email: email.trim().toLowerCase()
-    })
+        email: email.trim().toLowerCase()
+    });
 
     if (!user) {
-      throw new Error('Invalid or expired password reset code')
+        throw new Error('Invalid or expired password reset code');
     }
 
-    if(
-      !user.resetPasswordOtp ||
-      !user.resetPasswordOtpExpires
-    ){
-      throw new Error('Invalid or expired password reset code')
+    if (
+        !user.resetPasswordOtp ||
+        !user.resetPasswordOtpExpires
+    ) {
+        throw new Error('Invalid or expired password reset code');
     }
 
+    // check whether the OTP has expired
     if (user.resetPasswordOtpExpires < new Date()) {
-      throw new Error('Password reset code has expired')
+        throw new Error('Password reset code has expired');
     }
 
     // hash the submitted OTP and compare it with the stored hash
     const hashedOtp = createHash('sha256')
-      .update(otp)
-      .digest('hex')
+        .update(otp)
+        .digest('hex');
 
-    if(hashedOtp !== user.resetPasswordOtp){
-      throw new Error('Invalid or expired password reset code')
+    if (hashedOtp !== user.resetPasswordOtp) {
+        throw new Error('Invalid or expired password reset code');
     }
 
-    // hash the new password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt)
-
-    user.resetPasswordOtp = undefined
-    user.resetPasswordOtpExpires = undefined
-
-    //invalidate previously issued JWTs
-    user.tokenVersion = (user.tokenVersion ?? 0) + 1
+    // mark the OTP as verified
+    user.resetPasswordOtpVerified = true;
 
     await user.save();
 
     return {
-      message: 'Password reset successful. You may proceed to log in'
-    }
-  }
+        message: 'Password reset code verified successfully'
+    };
+};
 
+
+// resend password reset OTP
+const resendResetCode = async (email) => {
+    if (!email) {
+        throw new Error('Email is required');
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const user = await User.findOne({
+        email: normalizedEmail
+    });
+
+    // use a generic response to avoid revealing registered emails
+    const response = {
+        message: 'If an account with the email exists, a password reset code has been sent'
+    };
+
+    if (!user) {
+        return response;
+    }
+
+    // prevent resending within 30 seconds
+    if (
+        user.resetPasswordOtpLastSentAt &&
+        Date.now() - user.resetPasswordOtpLastSentAt.getTime() < 30 * 1000
+    ) {
+        throw new Error(
+            'Please wait 30 seconds before requesting another code'
+        );
+    }
+
+    // generate a new secure 6-digit OTP
+    const otp = randomInt(100000, 1000000).toString();
+
+    // hash the new OTP before saving it
+    user.resetPasswordOtp = createHash('sha256')
+        .update(otp)
+        .digest('hex');
+
+    // reset OTP expiry to 10 minutes
+    user.resetPasswordOtpExpires = new Date(
+        Date.now() + 10 * 60 * 1000
+    );
+
+    // record when the code was last sent
+    user.resetPasswordOtpLastSentAt = new Date();
+
+    // the new code must be verified separately
+    user.resetPasswordOtpVerified = false;
+
+    await user.save();
+
+    // send the new password reset OTP
+    try {
+        await transporter.sendMail({
+            from: `"Careporium" <${process.env.EMAIL_FROM}>`,
+            to: user.email,
+            subject: 'Your New Careporium Password Reset Code',
+            text: `Your new Careporium password reset code is ${otp}. It expires in 10 minutes. If you did not request this, you can ignore this email.`
+        });
+    } catch (emailError) {
+        // clear reset details if the email could not be sent
+        user.resetPasswordOtp = undefined;
+        user.resetPasswordOtpExpires = undefined;
+        user.resetPasswordOtpLastSentAt = undefined;
+        user.resetPasswordOtpVerified = false;
+
+        await user.save();
+
+        throw new Error(
+            'Unable to send the password reset email. Please try again'
+        );
+    }
+
+    return response;
+};
+
+
+// reset password
+const resetPassword = async (email, otp, newPassword) => {
+    if (!email || !otp || !newPassword) {
+        throw new Error(
+            'Email, OTP and new password are required'
+        );
+    }
+
+    if (newPassword.length < 8) {
+        throw new Error(
+            'Password must be at least 8 characters long'
+        );
+    }
+
+    const user = await User.findOne({
+        email: email.trim().toLowerCase()
+    });
+
+    if (!user) {
+        throw new Error('Invalid or expired password reset code');
+    }
+
+    if (
+        !user.resetPasswordOtp ||
+        !user.resetPasswordOtpExpires
+    ) {
+        throw new Error('Invalid or expired password reset code');
+    }
+
+    // check whether the OTP has expired
+    if (user.resetPasswordOtpExpires < new Date()) {
+        throw new Error('Password reset code has expired');
+    }
+
+    // ensure the OTP was verified before resetting the password
+    if (!user.resetPasswordOtpVerified) {
+        throw new Error(
+            'Please verify your password reset code first'
+        );
+    }
+
+    // hash the submitted OTP and compare it with the stored hash
+    const hashedOtp = createHash('sha256')
+        .update(otp)
+        .digest('hex');
+
+    if (hashedOtp !== user.resetPasswordOtp) {
+        throw new Error('Invalid or expired password reset code');
+    }
+
+    // hash the new password
+    const salt = await bcrypt.genSalt(10);
+
+    user.password = await bcrypt.hash(newPassword, salt);
+
+    // clear reset details after successful password reset
+    user.resetPasswordOtp = undefined;
+    user.resetPasswordOtpExpires = undefined;
+    user.resetPasswordOtpLastSentAt = undefined;
+    user.resetPasswordOtpVerified = false;
+
+    // invalidate previously issued JWTs
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+
+    await user.save();
+
+    return {
+        message: 'Password reset successful. You may proceed to log in'
+    };
+};
 
 // delete user account and associated worker or facility profile
 const deleteUser = async (userId) => {
@@ -640,6 +792,8 @@ export {
     logoutUser,
     getProfile,
     forgotPassword,
+    verifyResetCode,
+    resendResetCode,
     resetPassword,
     deleteUser
 };

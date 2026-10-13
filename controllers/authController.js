@@ -1,5 +1,6 @@
 import { registerWorker, registerFacility, verifyAccount, resendVerificationOtp,
-         loginUser, logoutUser, getProfile, forgotPassword, resetPassword, deleteUser } from '../services/authService.js';
+         loginUser, logoutUser, getProfile, forgotPassword, verifyResetCode, resendResetCode, 
+         resetPassword, deleteUser } from '../services/authService.js';
 
 // handles worker's registeration
 // worker registration
@@ -162,6 +163,63 @@ const forgotPasswordController = async (req, res) => {
     }
   }
 
+  // verify password reset OTP
+const verifyResetCodeController = async (req, res) => {
+
+    try {
+
+        const { email, otp } = req.body;
+
+        const result = await verifyResetCode(email, otp);
+
+        return res.status(200).json({
+            success: true,
+            message: result.message,
+            data: result
+        });
+
+    } catch (error) {
+
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+};
+
+// resend password reset OTP
+const resendResetCodeController = async (req, res) => {
+
+    try {
+
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email is required'
+            });
+        }
+
+        const result = await resendResetCode(email);
+
+        return res.status(200).json({
+            success: true,
+            message: result.message,
+            data: result
+        });
+
+    } catch (error) {
+
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+};
+
 const resetPasswordController = async (req, res) => {
 
     try {
@@ -207,5 +265,16 @@ const deleteUserController = async (req, res) => {
     }
 };
 
-export { registerWorkerController, registerFacilityController, verifyAccountController, resendVerificationOtpController,
-         loginUserController, logoutUserController, getProfileController, forgotPasswordController, resetPasswordController, deleteUserController};
+export { registerWorkerController,
+    registerFacilityController,
+    verifyAccountController,
+    resendVerificationOtpController,
+    loginUserController,
+    logoutUserController,
+    getProfileController,
+    forgotPasswordController,
+    verifyResetCodeController,
+    resendResetCodeController,
+    resetPasswordController,
+    deleteUserController
+};

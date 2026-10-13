@@ -1,8 +1,8 @@
 import express from 'express'
 import upload from '../config/multer.js'
 import { registerWorkerController, registerFacilityController, verifyAccountController, resendVerificationOtpController, 
-         loginUserController, logoutUserController, getProfileController, forgotPasswordController, resetPasswordController,
-        deleteUserController } from '../controllers/authController.js'
+         loginUserController, logoutUserController, getProfileController, forgotPasswordController, verifyResetCodeController,
+         resendResetCodeController, resetPasswordController, deleteUserController } from '../controllers/authController.js'
 import { authMiddleware } from '../middleware/authMiddleware.js'
 
 const router = express.Router()
@@ -17,6 +17,10 @@ router.post('/login', loginUserController);
 router.post('/logout', authMiddleware, logoutUserController);
 router.get('/get-profile/:userId', authMiddleware, getProfileController);
 router.post('/forgot-password', forgotPasswordController);
+// verify password reset OTP
+router.post('/verify-reset-code', verifyResetCodeController);
+// resend password reset OTP
+router.post('/resend-reset-code', resendResetCodeController);
 router.post('/reset-password', resetPasswordController);
 router.delete('/delete-profile/:userId', deleteUserController)
 

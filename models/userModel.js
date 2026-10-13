@@ -40,14 +40,22 @@ const userSchema = new mongoose.Schema(
             type: Date
         },
 
+        // password reset fields
         resetPasswordOtp: {
-            type: String,
-            default: undefined
+            type: String
         },
 
         resetPasswordOtpExpires: {
-            type: Date,
-            default: undefined
+            type: Date
+        },
+
+        resetPasswordOtpLastSentAt: {
+            type: Date
+        },
+
+        resetPasswordOtpVerified: {
+            type: Boolean,
+            default: false
         },
 
         tokenVersion: {
