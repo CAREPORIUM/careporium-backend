@@ -15,7 +15,6 @@ const userSchema = new mongoose.Schema(
             default: ""
         },
 
-
         password: {
             type: String,
             required: true
@@ -58,9 +57,17 @@ const userSchema = new mongoose.Schema(
             default: false
         },
 
+        resetPasswordTokenHash: {
+            type: String
+        },
+
+        resetPasswordTokenExpires: {
+            type: Date
+        },
+
         tokenVersion: {
-        type: Number,
-        default: 0
+            type: Number,
+            default: 0
         },
     },
     {

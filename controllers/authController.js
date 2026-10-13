@@ -163,19 +163,22 @@ const forgotPasswordController = async (req, res) => {
     }
   }
 
-  // verify password reset OTP
+// verify password reset OTP
 const verifyResetCodeController = async (req, res) => {
 
     try {
 
-        const { email, otp } = req.body;
+        const { otp } = req.body;
 
-        const result = await verifyResetCode(email, otp);
+        const result = await verifyResetCode(otp);
 
         return res.status(200).json({
             success: true,
             message: result.message,
-            data: result
+            data: {
+                resetToken: result.resetToken,
+                expiresIn: result.expiresIn
+            }
         });
 
     } catch (error) {
@@ -220,15 +223,21 @@ const resendResetCodeController = async (req, res) => {
     }
 };
 
+// reset password
 const resetPasswordController = async (req, res) => {
 
     try {
 
-        const { email, otp, newPassword } = req.body;
+        const authorization = req.headers.authorization;
+
+        const resetToken = authorization?.startsWith('Bearer ')
+            ? authorization.slice(7)
+            : null;
+
+        const { newPassword } = req.body;
 
         const result = await resetPassword(
-            email,
-            otp,
+            resetToken,
             newPassword
         );
 

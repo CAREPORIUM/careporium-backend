@@ -1,26 +1,17 @@
 openapi: 3.0.3
-
 info:
   title: CAREPORIUM Backend API
   version: 1.0.0
   description: |
     OpenAPI documentation for the CAREPORIUM healthcare-worker shift marketplace backend.
-
-    Facilities can register, post shifts, and fund shifts through the payment provider.
-    Workers can manage their profiles, submit verification documents, apply for shifts,
-    and record attendance.
-
-    Shift creation initiates payment. A shift awaiting payment remains in
-    pending_payment status and becomes open only after payment is confirmed.
-
-    The platform commission is 10% of the worker payout amount.
-
+    This specification is based on the endpoints and request fields discussed so far.
+    Confirm each path and HTTP method against the project's route files before treating it
+    as an exact representation of the running server.
 servers:
   - url: https://careporium-backend.onrender.com
     description: Production server
   - url: http://localhost:8089
     description: Local development server
-
 tags:
   - name: Authentication
   - name: Worker Profiles
@@ -28,60 +19,39 @@ tags:
   - name: Shifts
   - name: Shift Applications
   - name: Attendance
-  - name: Payments
   - name: Admin
-
 security:
   - bearerAuth: []
-
 paths:
-
-  # =========================
-  # AUTHENTICATION
-  # =========================
-
   /api/auth/v1/register/worker:
     post:
       tags: [Authentication]
       summary: Register a worker account and profile
-      description: Creates a worker account and sends an account-verification OTP.
+      description: Multipart form fields may include worker details and optional profile documents, depending on the current registration controller.
       security: []
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
-              required:
-                - fullName
-                - email
-                - password
+              required: [fullName, email, phoneNumber, password]
               properties:
-                fullName:
-                  type: string
-                  example: Ada Okafor
-                email:
-                  type: string
-                  format: email
-                  example: ada@example.com
-                password:
-                  type: string
-                  format: password
-                  minLength: 8
-                phoneNumber:
-                  type: string
-                profession:
-                  type: string
-                  example: Nurse
-                specialty:
-                  type: string
-                  example: Emergency
-                yearsOfExperience:
-                  type: integer
-                  minimum: 0
-                  example: 3
-                location:
-                  $ref: '#/components/schemas/Location'
+                fullName: { type: string, example: Ada Okafor }
+                email: { type: string, format: email, example: ada@example.com }
+                phoneNumber: { type: string, example: "+2348012345678" }
+                password: { type: string, format: password, minLength: 8 }
+                profession: { type: string, example: Nurse }
+                specialty: { type: string, example: Emergency }
+                yearsOfExperience: { type: integer, minimum: 0, example: 3 }
+                address: { type: string }
+                street: { type: string }
+                state: { type: string }
+                country: { type: string, example: Nigeria }
+                professionalLicense: { type: string, format: binary }
+                idDocument: { type: string, format: binary }
+                educationCert: { type: string, format: binary }
+                proofOfLocation: { type: string, format: binary }
       responses:
         '201':
           description: Worker account created; verification email sent
@@ -91,14 +61,11 @@ paths:
                 $ref: '#/components/schemas/RegistrationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-
   /api/auth/v1/register/facility:
     post:
       tags: [Authentication]
       summary: Register a facility account and upload required documents
-      description: |
-        Creates a facility account and uploads its business registration certificate,
-        facility licence, and tax identification document.
+      description: Requires the three document uploads shown below. Location and secondary-contact fields use dotted multipart field names.
       security: []
       requestBody:
         required: true
@@ -106,62 +73,24 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required:
-                - facilityName
-                - facilityType
-                - email
-                - phoneNumber
-                - password
-                - location.address
-                - location.city
-                - location.state
-                - location.country
-                - businessRegCert
-                - facilityLicense
-                - taxID
+              required: [facilityName, facilityType, email, phoneNumber, password, businessRegCert, facilityLicense, taxID]
               properties:
-                facilityName:
-                  type: string
-                  example: CarePlus Hospital
-                facilityType:
-                  type: string
-                  example: Hospital
-                email:
-                  type: string
-                  format: email
-                phoneNumber:
-                  type: string
-                password:
-                  type: string
-                  format: password
-                  minLength: 8
-                location.address:
-                  type: string
-                location.city:
-                  type: string
-                location.state:
-                  type: string
-                location.country:
-                  type: string
-                  example: Nigeria
-                secondaryContact.fullName:
-                  type: string
-                secondaryContact.position:
-                  type: string
-                secondaryContact.email:
-                  type: string
-                  format: email
-                secondaryContact.phoneNumber:
-                  type: string
-                businessRegCert:
-                  type: string
-                  format: binary
-                facilityLicense:
-                  type: string
-                  format: binary
-                taxID:
-                  type: string
-                  format: binary
+                facilityName: { type: string, example: CarePlus Hospital }
+                facilityType: { type: string, example: Hospital }
+                email: { type: string, format: email }
+                phoneNumber: { type: string }
+                password: { type: string, format: password, minLength: 8 }
+                location.address: { type: string }
+                location.city: { type: string }
+                location.state: { type: string }
+                location.country: { type: string, example: Nigeria }
+                secondaryContact.fullName: { type: string }
+                secondaryContact.position: { type: string }
+                secondaryContact.email: { type: string, format: email }
+                secondaryContact.phoneNumber: { type: string }
+                businessRegCert: { type: string, format: binary }
+                facilityLicense: { type: string, format: binary }
+                taxID: { type: string, format: binary }
       responses:
         '201':
           description: Facility account created; verification email sent
@@ -171,7 +100,6 @@ paths:
                 $ref: '#/components/schemas/RegistrationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-
   /api/auth/v1/verify-account:
     post:
       tags: [Authentication]
@@ -185,20 +113,17 @@ paths:
               type: object
               required: [email, otp]
               properties:
-                email:
-                  type: string
-                  format: email
-                otp:
-                  type: string
-                  minLength: 6
-                  maxLength: 6
-                  example: '123456'
+                email: { type: string, format: email }
+                otp: { type: string, minLength: 6, maxLength: 6, example: '123456' }
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Account verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-
   /api/auth/v1/resend-otp:
     post:
       tags: [Authentication]
@@ -212,15 +137,12 @@ paths:
               type: object
               required: [email]
               properties:
-                email:
-                  type: string
-                  format: email
+                email: { type: string, format: email }
       responses:
         '200':
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-
   /api/auth/v1/login:
     post:
       tags: [Authentication]
@@ -234,12 +156,8 @@ paths:
               type: object
               required: [email, password]
               properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  format: password
+                email: { type: string, format: email }
+                password: { type: string, format: password }
       responses:
         '200':
           description: Login successful
@@ -248,18 +166,11 @@ paths:
               schema:
                 type: object
                 properties:
-                  message:
-                    type: string
-                  data:
-                    type: object
-                    properties:
-                      token:
-                        type: string
-                      user:
-                        $ref: '#/components/schemas/UserSummary'
+                  user:
+                    $ref: '#/components/schemas/UserSummary'
+                  token: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
-
   /api/auth/v1/logout:
     post:
       tags: [Authentication]
@@ -269,7 +180,6 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
-
   /api/auth/v1/get-profile:
     get:
       tags: [Authentication]
@@ -279,11 +189,11 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
-
   /api/auth/v1/forgot-password:
     post:
       tags: [Authentication]
       summary: Request a password-reset OTP
+      description: Sends a password-reset OTP to the account email. A generic response should be returned whether or not the email exists.
       security: []
       requestBody:
         required: true
@@ -293,20 +203,17 @@ paths:
               type: object
               required: [email]
               properties:
-                email:
-                  type: string
-                  format: email
+                email: { type: string, format: email, example: user@example.com }
       responses:
         '200':
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-
   /api/auth/v1/verify-reset-code:
     post:
       tags: [Authentication]
-      summary: Verify password reset OTP
-      description: Verifies the OTP sent to the user's email.
+      summary: Verify password-reset OTP
+      description: Verifies the OTP and returns a short-lived, single-use reset token. The email is not submitted to this endpoint.
       security: []
       requestBody:
         required: true
@@ -314,30 +221,34 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email, otp]
+              required: [otp]
               properties:
-                email:
-                  type: string
-                  format: email
-                  example: user@example.com
                 otp:
                   type: string
+                  pattern: '^\d{6}$'
                   example: '123456'
       responses:
         '200':
-          description: Password reset OTP verified successfully
+          description: OTP verified; temporary reset token returned
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: Password reset code verified successfully }
+                  data:
+                    type: object
+                    properties:
+                      resetToken: { type: string, description: Temporary token used only for resetting the password }
+                      expiresIn: { type: integer, example: 600, description: Token lifetime in seconds }
         '400':
           $ref: '#/components/responses/BadRequest'
-
   /api/auth/v1/resend-reset-code:
     post:
       tags: [Authentication]
-      summary: Resend password reset OTP
-      description: Sends a new password reset OTP to the user's email.
+      summary: Resend password-reset OTP
+      description: Sends a replacement OTP to the provided email. A resend cooldown may apply.
       security: []
       requestBody:
         required: true
@@ -347,55 +258,35 @@ paths:
               type: object
               required: [email]
               properties:
-                email:
-                  type: string
-                  format: email
-                  example: user@example.com
+                email: { type: string, format: email, example: user@example.com }
       responses:
         '200':
-          description: Password reset OTP resent successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-
   /api/auth/v1/reset-password:
     post:
       tags: [Authentication]
-      summary: Reset password using OTP
-      security: []
+      summary: Reset password using a temporary reset token
+      description: Send the reset token returned by verify-reset-code as a Bearer token. Do not use the normal login JWT. The token is short-lived and single-use.
+      security:
+        - resetTokenAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - email
-                - otp
-                - newPassword
+              required: [newPassword]
               properties:
-                email:
-                  type: string
-                  format: email
-                otp:
-                  type: string
-                  example: '123456'
-                newPassword:
-                  type: string
-                  format: password
-                  minLength: 8
+                newPassword: { type: string, format: password, minLength: 8, example: StrongPassword123! }
       responses:
         '200':
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-
-  # =========================
-  # WORKER PROFILES
-  # =========================
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/worker/v1/get-worker-profile/{userId}:
     get:
@@ -406,11 +297,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-
   /api/worker/v1/update-worker-profile/{userId}:
     put:
       tags: [Worker Profiles]
@@ -424,48 +312,24 @@ paths:
             schema:
               type: object
               properties:
-                fullName:
-                  type: string
-                profession:
-                  type: string
-                specialty:
-                  type: string
-                yearsOfExperience:
-                  type: integer
-                  minimum: 0
-                about:
-                  type: string
-                address:
-                  type: string
-                street:
-                  type: string
-                state:
-                  type: string
-                country:
-                  type: string
-                professionalLicense:
-                  type: string
-                  format: binary
-                idDocument:
-                  type: string
-                  format: binary
-                educationCert:
-                  type: string
-                  format: binary
-                proofOfLocation:
-                  type: string
-                  format: binary
+                fullName: { type: string }
+                profession: { type: string }
+                specialty: { type: string }
+                yearsOfExperience: { type: integer, minimum: 0 }
+                about: { type: string }
+                address: { type: string }
+                street: { type: string }
+                state: { type: string }
+                country: { type: string }
+                professionalLicense: { type: string, format: binary }
+                idDocument: { type: string, format: binary }
+                educationCert: { type: string, format: binary }
+                proofOfLocation: { type: string, format: binary }
       responses:
         '200':
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  # =========================
-  # FACILITY PROFILES
-  # =========================
 
   /api/facility/v1/get-facility-profile:
     get:
@@ -476,7 +340,6 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
-
   /api/facility/v1/update-facility-profile:
     put:
       tags: [Facility Profiles]
@@ -488,10 +351,8 @@ paths:
             schema:
               type: object
               properties:
-                facilityName:
-                  type: string
-                facilityType:
-                  type: string
+                facilityName: { type: string }
+                facilityType: { type: string }
                 location:
                   $ref: '#/components/schemas/Location'
                 secondaryContact:
@@ -501,87 +362,39 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  # =========================
-  # SHIFTS
-  # =========================
 
   /api/shifts/v1/create-shift:
     post:
       tags: [Shifts]
-      summary: Create a shift and initiate payment
-      description: |
-        Creates a shift and initiates funding for the entire shift.
-
-        The platform commission is 10% of the worker payout amount.
-        The shift remains in pending_payment status until payment is confirmed.
-        Once payment is confirmed, the shift becomes open.
-
-        If payment initialization fails, an error is returned. The response
-        may include shiftId so the facility can retry payment for the existing shift.
+      summary: Create a shift
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ShiftInput'
-            example:
-              profession: Nurse
-              specialty: Emergency
-              shiftDate: '2026-10-20'
-              shiftType: Day
-              startTime: '08:00'
-              endTime: '16:00'
-              professionalsNeeded: 2
-              minimumExperience: 2
-              location: Lagos
-              responsibilities: Provide patient care during the shift
-              reqCredentials:
-                - Valid professional license
-              payRate: 25000
-              isUrgent: false
-              clientPlatform: web
       responses:
         '201':
-          description: Shift created and payment initialized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreateShiftPaymentResponse'
+          $ref: '#/components/responses/Success'
         '400':
-          description: Invalid shift details or payment initialization failed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
+          $ref: '#/components/responses/BadRequest'
   /api/shifts/v1/get-shifts:
     get:
       tags: [Shifts]
-      summary: Retrieve available shifts
-      description: Returns shifts available for discovery.
+      summary: Retrieve shifts
       parameters:
         - in: query
           name: status
-          schema:
-            type: string
-            example: open
+          schema: { type: string, example: open }
         - in: query
-          name: profession
-          schema:
-            type: string
+          name: role
+          schema: { type: string }
         - in: query
           name: specialty
-          schema:
-            type: string
+          schema: { type: string }
       responses:
         '200':
           $ref: '#/components/responses/Success'
-
   /api/shifts/v1/get-single-shift/{shiftId}:
     get:
       tags: [Shifts]
@@ -593,7 +406,6 @@ paths:
           $ref: '#/components/responses/Success'
         '404':
           $ref: '#/components/responses/NotFound'
-
   /api/shifts/v1/get-facility-shifts:
     get:
       tags: [Shifts]
@@ -601,9 +413,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
   /api/shifts/v1/update-shift/{shiftId}:
     put:
       tags: [Shifts]
@@ -621,9 +430,6 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
   /api/shifts/v1/close-shift/{shiftId}:
     patch:
       tags: [Shifts]
@@ -633,9 +439,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
   /api/shifts/v1/complete-shift/{shiftId}:
     patch:
       tags: [Shifts]
@@ -645,11 +448,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
   /api/shifts/v1/delete-shift/{shiftId}:
     delete:
       tags: [Shifts]
@@ -659,14 +457,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
-        '400':
-          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
-
-  # =========================
-  # SHIFT APPLICATIONS
-  # =========================
 
   /api/applications/v1/apply/{shiftId}:
     post:
@@ -679,9 +471,6 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
   /api/applications/v1/my-applications:
     get:
       tags: [Shift Applications]
@@ -689,9 +478,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
   /api/applications/v1/facility-applications:
     get:
       tags: [Shift Applications]
@@ -699,46 +485,24 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /api/applications/v1/update-application/{applicationId}:
+  /api/applications/v1/accept/{applicationId}:
     patch:
       tags: [Shift Applications]
-      summary: Update an application status
-      description: Allows an authorized facility to accept or reject an application.
+      summary: Accept a shift application
       parameters:
         - $ref: '#/components/parameters/ApplicationId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateApplicationRequest'
-            examples:
-              acceptApplication:
-                summary: Accept an application
-                value:
-                  status: accepted
-              rejectApplication:
-                summary: Reject an application
-                value:
-                  status: rejected
       responses:
         '200':
           $ref: '#/components/responses/Success'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  # =========================
-  # ATTENDANCE
-  # =========================
+  /api/applications/v1/reject/{applicationId}:
+    patch:
+      tags: [Shift Applications]
+      summary: Reject a shift application
+      parameters:
+        - $ref: '#/components/parameters/ApplicationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
 
   /api/attendance/v1/qr/{shiftId}:
     get:
@@ -749,11 +513,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
   /api/attendance/v1/clock-in:
     post:
       tags: [Attendance]
@@ -766,16 +525,12 @@ paths:
               type: object
               required: [qrToken]
               properties:
-                qrToken:
-                  type: string
+                qrToken: { type: string }
       responses:
         '200':
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
   /api/attendance/v1/clock-out:
     post:
       tags: [Attendance]
@@ -788,150 +543,18 @@ paths:
               type: object
               required: [qrToken]
               properties:
-                qrToken:
-                  type: string
+                qrToken: { type: string }
       responses:
         '200':
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  # =========================
-  # PAYMENTS
-  # =========================
-
-  /api/payments/v1/retry/{shiftId}:
-    post:
-      tags: [Payments]
-      summary: Retry payment for a shift
-      description: |
-        Allows the facility that owns the shift to retry payment when the shift
-        is awaiting payment. Payment initialization does not itself confirm that
-        the funds have been received.
-
-        The shift becomes open after the provider confirms funding.
-      parameters:
-        - $ref: '#/components/parameters/ShiftId'
-      responses:
-        '200':
-          description: Payment retry initialized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RetryShiftPaymentResponse'
-        '400':
-          description: Shift is not eligible for retry or payment initialization failed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /api/payments/v1/harrenapay/webhook:
-    post:
-      tags: [Payments]
-      summary: Receive HarrenaPay payment notifications
-      description: |
-        Provider-to-server webhook endpoint.
-
-        HarrenaPay sends payment events to this endpoint. Requests must include
-        the x-harrenapay-signature header. The server verifies the signature
-        against the raw request body before processing the event.
-
-        This endpoint is intended for the payment provider, not for a frontend
-        client to mark its own payment as successful.
-      security: []
-      parameters:
-        - in: header
-          name: x-harrenapay-signature
-          required: true
-          description: HMAC-SHA256 signature of the raw request body.
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/HarrenaPayWebhookEvent'
-            examples:
-              escrowFunded:
-                summary: Escrow funded event
-                value:
-                  event: escrow.funded
-                  reference: careporium_shift_671234abcd
-                  amount: 5500000
-                  currency: NGN
-              paymentSuccess:
-                summary: Payment success event
-                value:
-                  event: payment.success
-                  reference: careporium_shift_671234abcd
-                  amount: 5500000
-                  currency: NGN
-              paymentFailed:
-                summary: Payment failure event
-                value:
-                  event: payment.failed
-                  reference: careporium_shift_671234abcd
-                  amount: 5500000
-                  currency: NGN
-      responses:
-        '200':
-          description: Webhook processed or acknowledged
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentWebhookResponse'
-        '400':
-          description: Invalid webhook payload
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentErrorResponse'
-        '401':
-          description: Missing or invalid webhook signature
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentErrorResponse'
-        '500':
-          description: Webhook processing failed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentErrorResponse'
-
-  # =========================
-  # ADMIN
-  # =========================
 
   /api/admin/v1/workers:
     get:
       tags: [Admin]
       summary: Retrieve all workers
-      description: Admin access required. Populated user details should exclude passwords and OTP fields.
-      responses:
-        '200':
-          $ref: '#/components/responses/Success'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
-  /api/admin/v1/workers/pending:
-    get:
-      tags: [Admin]
-      summary: Retrieve workers with pending overall verification status
+      description: Admin access required. Returns worker profiles with populated user details excluding password and OTP fields.
       responses:
         '200':
           $ref: '#/components/responses/Success'
@@ -962,9 +585,7 @@ paths:
     patch:
       tags: [Admin]
       summary: Verify or reject a worker document
-      description: |
-        Rejecting a document requires a non-empty comment.
-        Worker verification status is recalculated from the four required documents.
+      description: Rejecting a document requires a non-empty comment. The worker verification status is recalculated from all four required documents.
       parameters:
         - $ref: '#/components/parameters/WorkerId'
       requestBody:
@@ -987,7 +608,11 @@ paths:
                   comment: The uploaded document is unclear.
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Document review saved and worker verification status recalculated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -999,7 +624,7 @@ paths:
     get:
       tags: [Admin]
       summary: Retrieve all facilities
-      description: Admin access required. Populated user details should exclude passwords and OTP fields.
+      description: Admin access required. Returns facility profiles with populated user details excluding password and OTP fields.
       responses:
         '200':
           $ref: '#/components/responses/Success'
@@ -1044,9 +669,7 @@ paths:
     patch:
       tags: [Admin]
       summary: Verify or reject a facility document
-      description: |
-        Rejecting a document requires a non-empty comment.
-        Facility verification status is recalculated from the three required documents.
+      description: Rejecting a document requires a non-empty comment. Facility verification status is recalculated from all three required documents.
       parameters:
         - $ref: '#/components/parameters/FacilityId'
       requestBody:
@@ -1069,7 +692,11 @@ paths:
                   comment: The uploaded tax document is invalid.
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Document review saved and facility verification status recalculated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1077,11 +704,25 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/admin/v1/workers/pending:
+    get:
+      tags: [Admin]
+      summary: Retrieve workers with pending overall verification status
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
   /api/admin/v1/verification-queue:
     get:
       tags: [Admin]
-      summary: Retrieve pending worker and facility document reviews
-      description: Returns individual uploaded documents whose verification status is pending.
+      summary: Retrieve individual worker and facility documents awaiting verification
+      description: Returns one queue item per uploaded document whose document verificationStatus is pending, sorted newest profile submission first.
       responses:
         '200':
           description: Combined verification queue
@@ -1108,10 +749,7 @@ paths:
     get:
       tags: [Admin]
       summary: Retrieve admin dashboard statistics
-      description: |
-        Returns total workers, verified workers, total facilities,
-        verified facilities, pending document reviews, active shifts,
-        and completed shifts.
+      description: Returns counts of workers, verified workers, facilities, verified facilities, pending individual document reviews, active shifts (open or filled), and completed shifts.
       responses:
         '200':
           description: Dashboard statistics
@@ -1126,27 +764,13 @@ paths:
                   data:
                     type: object
                     properties:
-                      totalWorkers:
-                        type: integer
-                        example: 120
-                      verifiedWorkers:
-                        type: integer
-                        example: 78
-                      totalFacilities:
-                        type: integer
-                        example: 25
-                      verifiedFacilities:
-                        type: integer
-                        example: 18
-                      pendingVerifications:
-                        type: integer
-                        example: 14
-                      activeShifts:
-                        type: integer
-                        example: 9
-                      completedShifts:
-                        type: integer
-                        example: 43
+                      totalWorkers: { type: integer, example: 120 }
+                      verifiedWorkers: { type: integer, example: 78 }
+                      totalFacilities: { type: integer, example: 25 }
+                      verifiedFacilities: { type: integer, example: 18 }
+                      pendingVerifications: { type: integer, example: 14 }
+                      activeShifts: { type: integer, example: 9 }
+                      completedShifts: { type: integer, example: 43 }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1155,400 +779,149 @@ paths:
           $ref: '#/components/responses/ServerError'
 
 components:
-
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-
+    resetTokenAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: ResetToken
+      description: Temporary token returned by verify-reset-code. Use only for reset-password, not as a normal login JWT.
   parameters:
     UserId:
       in: path
       name: userId
       required: true
-      schema:
-        type: string
-
+      schema: { type: string }
     WorkerId:
       in: path
       name: workerId
       required: true
-      schema:
-        type: string
-
+      schema: { type: string }
     FacilityId:
       in: path
       name: facilityId
       required: true
-      schema:
-        type: string
-
+      schema: { type: string }
     ShiftId:
       in: path
       name: shiftId
       required: true
-      schema:
-        type: string
-
+      schema: { type: string }
     ApplicationId:
       in: path
       name: applicationId
       required: true
-      schema:
-        type: string
-
+      schema: { type: string }
   schemas:
-
     RegistrationResponse:
       type: object
       properties:
-        message:
-          type: string
+        message: { type: string }
         data:
           type: object
-          additionalProperties: true
-
-    SuccessResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: true
-        message:
-          type: string
-        data:
-          nullable: true
-          type: object
-          additionalProperties: true
-
+          properties:
+            userId: { type: string }
+            workerId: { type: string }
+            facilityId: { type: string }
     UserSummary:
       type: object
       properties:
-        id:
-          type: string
-        email:
-          type: string
-          format: email
-        role:
-          type: string
-          enum: [worker, facility, admin]
-        isVerified:
-          type: boolean
-
+        id: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [worker, facility, admin] }
+        isVerified: { type: boolean }
     Location:
       type: object
       properties:
-        address:
-          type: string
-        street:
-          type: string
-        city:
-          type: string
-        state:
-          type: string
-        country:
-          type: string
-
+        address: { type: string }
+        street: { type: string }
+        city: { type: string }
+        state: { type: string }
+        country: { type: string }
     SecondaryContact:
       type: object
       properties:
-        fullName:
-          type: string
-        position:
-          type: string
-        email:
-          type: string
-          format: email
-        phoneNumber:
-          type: string
-
+        fullName: { type: string }
+        position: { type: string }
+        email: { type: string, format: email }
+        phoneNumber: { type: string }
     ShiftInput:
       type: object
-      required:
-        - profession
-        - shiftDate
-        - startTime
-        - endTime
-        - professionalsNeeded
-        - payRate
+      required: [role, date, startTime, endTime]
       properties:
-        profession:
-          type: string
-          example: Nurse
-        specialty:
-          type: string
-          example: Emergency
-        shiftDate:
-          type: string
-          format: date
-          example: '2026-10-20'
-        shiftType:
-          type: string
-          example: Day
-        startTime:
-          type: string
-          example: '08:00'
-        endTime:
-          type: string
-          example: '16:00'
-        professionalsNeeded:
-          type: integer
-          minimum: 1
-          example: 2
-        minimumExperience:
-          type: integer
-          minimum: 0
-          example: 2
+        role: { type: string, example: Nurse }
+        specialty: { type: string }
+        workType: { type: string }
+        description: { type: string }
+        requirements:
+          oneOf:
+            - type: array
+              items: { type: string }
+            - type: string
+        professionalsNeeded: { type: integer, minimum: 1 }
+        date: { type: string, format: date }
+        startTime: { type: string, example: "08:00" }
+        endTime: { type: string, example: "16:00" }
+        shiftType: { type: string }
         location:
-          type: string
-          example: Lagos
-        responsibilities:
-          type: string
-          example: Provide patient care during the shift
-        reqCredentials:
-          type: array
-          items:
-            type: string
-          example:
-            - Valid professional license
-        arrivalInstructions:
-          type: string
-        payRate:
-          type: number
-          minimum: 0.01
-          description: Pay rate per worker, in NGN, if that is how the service interprets this field.
-          example: 25000
-        isUrgent:
-          type: boolean
-          default: false
-        clientPlatform:
-          type: string
-          enum: [web, mobile]
-          default: web
-
-    UpdateApplicationRequest:
-      type: object
-      required: [status]
-      properties:
-        status:
-          type: string
-          enum: [accepted, rejected]
-
+          $ref: '#/components/schemas/Location'
     WorkerDocumentReviewInput:
       type: object
-      required:
-        - documentType
-        - status
+      required: [documentType, status]
       properties:
         documentType:
           type: string
-          enum:
-            - professionalLicense
-            - idDocument
-            - educationCert
-            - proofOfLocation
+          enum: [professionalLicense, idDocument, educationCert, proofOfLocation]
+          example: professionalLicense
         status:
           type: string
           enum: [verified, rejected]
+          example: verified
         comment:
           type: string
-          description: Required when rejecting a document.
-
+          description: Required when status is rejected.
+          example: The uploaded document is unclear.
     FacilityDocumentReviewInput:
       type: object
-      required:
-        - documentType
-        - status
+      required: [documentType, status]
       properties:
         documentType:
           type: string
-          enum:
-            - businessRegCert
-            - facilityLicense
-            - taxID
+          enum: [businessRegCert, facilityLicense, taxID]
+          example: businessRegCert
         status:
           type: string
           enum: [verified, rejected]
+          example: verified
         comment:
           type: string
-          description: Required when rejecting a document.
-
+          description: Required when status is rejected.
+          example: The uploaded document is invalid.
     VerificationQueueItem:
       type: object
       properties:
-        documentType:
-          type: string
-        documentUrl:
-          type: string
-          format: uri
-        status:
-          type: string
-          example: pending
-        comment:
-          type: string
-        workerId:
-          type: string
-        facilityId:
-          type: string
-        userId:
-          type: string
-        fullName:
-          type: string
-        facilityName:
-          type: string
-        profession:
-          type: string
-        facilityType:
-          type: string
-
-    CreateShiftPaymentResponse:
+        _id: { type: string }
+        type: { type: string, enum: [worker, facility] }
+        name: { type: string }
+        documentType: { type: string }
+        documentUrl: { type: string, format: uri }
+        documentVerificationStatus: { type: string, enum: [pending] }
+        verificationComment: { type: string }
+        submittedAt: { type: string, format: date-time }
+    SuccessResponse:
       type: object
       properties:
-        message:
-          type: string
-        data:
-          type: object
-          properties:
-            shift:
-              type: object
-              additionalProperties: true
-            payment:
-              $ref: '#/components/schemas/PaymentDetails'
-
-    RetryShiftPaymentResponse:
+        success: { type: boolean, example: true }
+        message: { type: string }
+        data: {}
+    ErrorResponse:
       type: object
       properties:
-        success:
-          type: boolean
-        message:
-          type: string
-        data:
-          type: object
-          properties:
-            shiftId:
-              type: string
-            payment:
-              $ref: '#/components/schemas/PaymentDetails'
-
-    PaymentDetails:
-      type: object
-      properties:
-        _id:
-          type: string
-        shift:
-          type: string
-        facility:
-          type: string
-        currency:
-          type: string
-          example: NGN
-        amountKobo:
-          type: integer
-          description: Total amount to fund, represented in kobo.
-          example: 5500000
-        commissionRateBps:
-          type: integer
-          description: Platform commission rate in basis points; 1000 represents 10%.
-          example: 1000
-        platformCommissionAmountKobo:
-          type: integer
-          example: 500000
-        workerPayoutAmountKobo:
-          type: integer
-          example: 5000000
-        provider:
-          type: string
-          enum: [mock, harrenapay]
-        providerReference:
-          type: string
-        providerEscrowId:
-          type: string
-        checkoutUrl:
-          type: string
-          format: uri
-        virtualAccountNumber:
-          type: string
-        bankName:
-          type: string
-        expiresAt:
-          type: string
-          format: date-time
-        fundingStatus:
-          type: string
-          enum: [pending, funded, failed, refunded]
-        completionStatus:
-          type: string
-          enum: [pending, submitted, confirmed, disputed]
-        payoutStatus:
-          type: string
-          enum: [not_ready, pending, processing, paid, failed, on_hold]
-        clientPlatform:
-          type: string
-          enum: [web, mobile]
-        disputeStatus:
-          type: string
-          enum: [none, open, resolved]
-        disputeReason:
-          type: string
-        payoutReference:
-          type: string
-        fundedAt:
-          type: string
-          format: date-time
-        completionConfirmedAt:
-          type: string
-          format: date-time
-        paidAt:
-          type: string
-          format: date-time
-
-    HarrenaPayWebhookEvent:
-      type: object
-      required:
-        - event
-        - reference
-        - amount
-        - currency
-      properties:
-        event:
-          type: string
-          enum:
-            - escrow.funded
-            - payment.success
-            - payment.failed
-        reference:
-          type: string
-          example: careporium_shift_671234abcd
-        amount:
-          type: integer
-          description: Amount as expected by the backend's webhook validation.
-          example: 5500000
-        currency:
-          type: string
-          example: NGN
-
-    PaymentWebhookResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: true
-        message:
-          type: string
-          example: Webhook received
-
-    PaymentErrorResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: false
-        message:
-          type: string
-        shiftId:
-          type: string
-
+        success: { type: boolean, example: false }
+        message: { type: string, example: Something went wrong }
   responses:
     Success:
       description: Request completed successfully
@@ -1556,38 +929,27 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/SuccessResponse'
-
     BadRequest:
-      description: Invalid request
+      description: Invalid input or request could not be completed
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/PaymentErrorResponse'
-
+            $ref: '#/components/schemas/ErrorResponse'
     Unauthorized:
-      description: Authentication is required or the token is invalid
+      description: Authentication required or token invalid
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/PaymentErrorResponse'
-
+            $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
-      description: The user does not have permission to perform this action
+      description: User is not permitted to perform this action
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/PaymentErrorResponse'
-
+            $ref: '#/components/schemas/ErrorResponse'
     NotFound:
-      description: Requested resource was not found
+      description: Resource not found
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/PaymentErrorResponse'
-
-    ServerError:
-      description: An unexpected server error occurred
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/PaymentErrorResponse'
+            $ref: '#/components/schemas/ErrorResponse'
