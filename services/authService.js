@@ -5,7 +5,6 @@ import mongoose from "mongoose";
 import User from "../models/userModel.js";
 import Worker from "../models/workerModel.js";
 import Facility from "../models/facilityModel.js";
-import cloudinary from "../config/cloudinary.js";
 import { transporter } from "./emailService.js";
 
 
@@ -18,9 +17,15 @@ const registerWorker = async (workerData) => {
         password,
         profession,
         specialty,
-        yearsOfExperience,
-        location
+        yearsOfExperience
     } = workerData;
+
+    const location = {
+    address: workerData['location.address'],
+    street: workerData['location.street'],
+    state: workerData['location.state'],
+    country: workerData['location.country']
+};
 
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -116,19 +121,19 @@ const registerFacility = async (req) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    const location = {
-        address: req.body['location.address'],
-        city: req.body['location.city'],
-        state: req.body['location.state'],
-        country: req.body['location.country']
-    };
+const location = {
+    address: req.body['location.address'],
+    city: req.body['location.city'],
+    state: req.body['location.state'],
+    country: req.body['location.country']
+};
 
-    const secondaryContact = {
-        fullName: req.body['secondaryContact.fullName'],
-        position: req.body['secondaryContact.position'],
-        email: req.body['secondaryContact.email'],
-        phoneNumber: req.body['secondaryContact.phoneNumber']
-    };
+const secondaryContact = {
+    fullName: req.body['secondaryContact.fullName'],
+    position: req.body['secondaryContact.position'],
+    email: req.body['secondaryContact.email'],
+    phoneNumber: req.body['secondaryContact.phoneNumber']
+};
 
     const existingUser = await User.findOne({
         email: normalizedEmail
@@ -136,18 +141,6 @@ const registerFacility = async (req) => {
 
     if (existingUser) {
         throw new Error('This business email already exists!');
-    }
-
-    // check required documents
-    if (
-        !req.files ||
-        !req.files.businessRegCert?.[0] ||
-        !req.files.facilityLicense?.[0] ||
-        !req.files.taxID?.[0]
-    ) {
-        throw new Error(
-            'Business registration certificate, facility license and Tax ID are required.'
-        );
     }
 
     if (!password || password.length < 8) {
@@ -165,54 +158,6 @@ const registerFacility = async (req) => {
 
     // OTP expires in 5 minutes
     const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
-
-    // upload facility documents
-    let businessRegCertUpload;
-    let facilityLicenseUpload;
-    let taxIDUpload;
-
-    try {
-        businessRegCertUpload = await cloudinary.uploader.upload(
-            req.files.businessRegCert[0].path
-        );
-
-        facilityLicenseUpload = await cloudinary.uploader.upload(
-            req.files.facilityLicense[0].path
-        );
-
-        taxIDUpload = await cloudinary.uploader.upload(
-            req.files.taxID[0].path
-        );
-
-    } catch (error) {
-        // clean up Cloudinary uploads if any upload fails
-        try {
-            if (businessRegCertUpload?.public_id) {
-                await cloudinary.uploader.destroy(
-                    businessRegCertUpload.public_id
-                );
-            }
-
-            if (facilityLicenseUpload?.public_id) {
-                await cloudinary.uploader.destroy(
-                    facilityLicenseUpload.public_id
-                );
-            }
-
-            if (taxIDUpload?.public_id) {
-                await cloudinary.uploader.destroy(
-                    taxIDUpload.public_id
-                );
-            }
-        } catch (cloudinaryError) {
-            console.error(
-                'Cloudinary cleanup failed:',
-                cloudinaryError
-            );
-        }
-
-        throw error;
-    }
 
     let user;
     let facility;
@@ -254,15 +199,6 @@ const registerFacility = async (req) => {
                     position: secondaryContact.position,
                     email: secondaryContact.email,
                     phoneNumber: secondaryContact.phoneNumber
-                },
-                businessRegCert: {
-                    url: businessRegCertUpload.secure_url
-                },
-                facilityLicense: {
-                    url: facilityLicenseUpload.secure_url
-                },
-                taxID: {
-                    url: taxIDUpload.secure_url
                 }
             }],
             { session }
@@ -274,33 +210,6 @@ const registerFacility = async (req) => {
 
     } catch (error) {
         await session.abortTransaction();
-
-        // clean up Cloudinary uploads if database creation fails
-        try {
-            if (businessRegCertUpload?.public_id) {
-                await cloudinary.uploader.destroy(
-                    businessRegCertUpload.public_id
-                );
-            }
-
-            if (facilityLicenseUpload?.public_id) {
-                await cloudinary.uploader.destroy(
-                    facilityLicenseUpload.public_id
-                );
-            }
-
-            if (taxIDUpload?.public_id) {
-                await cloudinary.uploader.destroy(
-                    taxIDUpload.public_id
-                );
-            }
-        } catch (cloudinaryError) {
-            console.error(
-                'Cloudinary cleanup failed:',
-                cloudinaryError
-            );
-        }
-
         throw error;
 
     } finally {

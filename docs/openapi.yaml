@@ -34,8 +34,7 @@ paths:
     post:
       tags: [Authentication]
       summary: Register a worker account and profile
-      description: Multipart form fields may include worker details and optional profile documents, depending on the current registration controller.
-      security: []
+      description: Creates a worker account and profile using JSON. Document uploads are handled through the worker profile update endpoint.
       requestBody:
         required: true
         content:
@@ -69,8 +68,8 @@ paths:
   /api/auth/v1/register/facility:
     post:
       tags: [Authentication]
-      summary: Register a facility account and upload required documents
-      description: Requires the three document uploads shown below. Location and secondary-contact fields use dotted multipart field names.
+      summary: Register a facility account and profile
+      description: Creates a facility account and profile using JSON. Document uploads are handled through the worker profile update endpoint.
       security: []
       requestBody:
         required: true
@@ -78,7 +77,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [facilityName, facilityType, email, phoneNumber, password, businessRegCert, facilityLicense, taxID]
+              required: [facilityName, facilityType, email, phoneNumber, password]
               properties:
                 facilityName: { type: string, example: CarePlus Hospital }
                 facilityType: { type: string, example: Hospital }
@@ -316,12 +315,13 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/worker/v1/update-worker-profile/{userId}:
+  /api/worker/v1/update-worker-profile:
     put:
       tags: [Worker Profiles]
-      summary: Update a worker profile and upload documents
-      parameters:
-        - $ref: '#/components/parameters/UserId'
+      summary: Update a worker profile
+      description: Updates worker profile details, uploads new verification documents, or replaces existing documents. All fields are optional, so documents can be uploaded without sending text fields.
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -329,24 +329,46 @@ paths:
             schema:
               type: object
               properties:
-                fullName: { type: string }
-                profession: { type: string }
-                specialty: { type: string }
-                yearsOfExperience: { type: integer, minimum: 0 }
-                about: { type: string }
-                address: { type: string }
-                street: { type: string }
-                state: { type: string }
-                country: { type: string }
-                professionalLicense: { type: string, format: binary }
-                idDocument: { type: string, format: binary }
-                educationCert: { type: string, format: binary }
-                proofOfLocation: { type: string, format: binary }
+                fullName:
+                  type: string
+                profession:
+                  type: string
+                specialty:
+                  type: string
+                yearsOfExperience:
+                  type: integer
+                  minimum: 0
+                about:
+                  type: string
+                locationAddress:
+                  type: string
+                locationStreet:
+                  type: string
+                locationState:
+                  type: string
+                locationCountry:
+                  type: string
+                professionalLicense:
+                  type: string
+                  format: binary
+                idDocument:
+                  type: string
+                  format: binary
+                educationCert:
+                  type: string
+                  format: binary
+                proofOfLocation:
+                  type: string
+                  format: binary
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Worker profile updated successfully
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Authentication required
+        '404':
+          description: Worker profile not found 
 
   /api/facility/v1/get-facility-profile:
     get:
@@ -362,24 +384,55 @@ paths:
     put:
       tags: [Facility Profiles]
       summary: Update the authenticated facility profile
+      description: Updates facility profile details, uploads new verification documents, or replaces existing documents. All fields are optional, so documents can be uploaded without sending text fields.
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               properties:
-                facilityName: { type: string }
-                facilityType: { type: string }
-                location:
-                  $ref: '#/components/schemas/Location'
-                secondaryContact:
-                  $ref: '#/components/schemas/SecondaryContact'
+                facilityName:
+                  type: string
+                facilityType:
+                  type: string
+                locationAddress:
+                  type: string
+                locationCity:
+                  type: string
+                locationState:
+                  type: string
+                locationCountry:
+                  type: string
+                secondaryContactFullName:
+                  type: string
+                secondaryContactPosition:
+                  type: string
+                secondaryContactEmail:
+                  type: string
+                  format: email
+                secondaryContactPhoneNumber:
+                  type: string
+                businessRegCert:
+                  type: string
+                  format: binary
+                facilityLicense:
+                  type: string
+                  format: binary
+                taxID:
+                  type: string
+                  format: binary
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Facility profile updated successfully
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Authentication required
+        '404':
+          description: Facility profile not found
   /api/shifts/v1/create-shift:
     post:
       summary: Create a new shift

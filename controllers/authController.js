@@ -22,23 +22,18 @@ const registerWorkerController = async (req, res) => {
 
 // handles facility's registration
 const registerFacilityController = async (req, res) => {
-  try {
-    const result = await registerFacility(req, res);
-    /* * if (!req.file) {
-            return res.status(400).json({
-                message: 'File is required. Please upload the required document.'
-            });
-        } */
+    try {
+        const result = await registerFacility(req);
 
-    res.status(201).json({
-      message: "Facility account has been created successfully",
-      data: result,
-    });
-  } catch (error) {
-    res.status(400).json({
-      message: error.message,
-    });
-  }
+        res.status(201).json({
+            message: "Facility account has been created successfully. Please check your email for your verification code.",
+            data: result,
+        });
+    } catch (error) {
+        res.status(400).json({
+            message: error.message,
+        });
+    }
 };
 
 // receives the worker registration request and passes the request data to the...
