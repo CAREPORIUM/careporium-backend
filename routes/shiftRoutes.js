@@ -9,7 +9,7 @@ const router = express.Router();
 router.post("/create-shift", authMiddleware, requireRole("facility"), shiftController.createShift)
 router.get("/get-shifts", authMiddleware, requireRole("worker"), shiftController.getAllShifts)
 router.get("/get-shift/:shiftId", authMiddleware, shiftController.getShiftById)
-router.get("/my-shifts", authMiddleware, requireRole("facility"), shiftController.getShiftsForFacility)
+router.get("/get-facility-shifts", authMiddleware, requireRole("facility"), shiftController.getShiftsForFacility)
 router.put("/update-shift/:shiftId", authMiddleware, requireRole("facility"), shiftController.updateShift)
 router.patch("/close-shift/:shiftId", authMiddleware, requireRole("facility"), shiftController.closeShift)
 router.patch("/complete-shift/:shiftId", authMiddleware, requireRole("facility"), shiftController.completeShift)

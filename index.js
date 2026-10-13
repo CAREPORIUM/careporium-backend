@@ -25,7 +25,9 @@ const app = express();
 // Allow requests from the CAREPORIUM frontend
 const allowedOrigins = [
     process.env.FRONTEND_LOCAL_URL,
-    process.env.FRONTEND_PROD_URL
+    process.env.FRONTEND_PROD_URL,
+    'http://localhost:8089',
+    'https://careporium-backend.onrender.com'
 ].filter(Boolean);
 
 app.use(cors({
@@ -73,7 +75,6 @@ app.use("/api/shifts/v1", shiftRoutes);
 app.use("/api/applications/v1", applicationRoutes);
 app.use("/api/admin/v1", adminRoutes);
 app.use("/api/attendance/v1", attendanceRoutes);
-app.use("/api/payment/v1", paymentRoutes)
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

@@ -12,6 +12,7 @@ servers:
     description: Production server
   - url: http://localhost:8089
     description: Local development server
+
 tags:
   - name: Authentication
   - name: Worker Profiles
@@ -20,8 +21,14 @@ tags:
   - name: Shift Applications
   - name: Attendance
   - name: Admin
+  - name: Payments
+    description: CAREPORIUM shift funding and payment webhook endpoints
+  - name: HarrenaPay Sandbox Testing
+    description: External HarrenaPay endpoint for simulating escrow funding in sandbox tests only
+
 security:
   - bearerAuth: []
+
 paths:
   /api/auth/v1/register/worker:
     post:
@@ -61,6 +68,7 @@ paths:
                 $ref: '#/components/schemas/RegistrationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/register/facility:
     post:
       tags: [Authentication]
@@ -100,6 +108,7 @@ paths:
                 $ref: '#/components/schemas/RegistrationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/verify-account:
     post:
       tags: [Authentication]
@@ -124,6 +133,7 @@ paths:
                 $ref: '#/components/schemas/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/resend-otp:
     post:
       tags: [Authentication]
@@ -143,6 +153,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/login:
     post:
       tags: [Authentication]
@@ -171,6 +182,7 @@ paths:
                   token: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/logout:
     post:
       tags: [Authentication]
@@ -180,6 +192,7 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /api/auth/v1/get-profile:
     get:
       tags: [Authentication]
@@ -189,6 +202,7 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /api/auth/v1/forgot-password:
     post:
       tags: [Authentication]
@@ -209,6 +223,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/verify-reset-code:
     post:
       tags: [Authentication]
@@ -240,10 +255,16 @@ paths:
                   data:
                     type: object
                     properties:
-                      resetToken: { type: string, description: Temporary token used only for resetting the password }
-                      expiresIn: { type: integer, example: 600, description: Token lifetime in seconds }
+                      resetToken:
+                        type: string
+                        description: Temporary token used only for resetting the password
+                      expiresIn:
+                        type: integer
+                        example: 600
+                        description: Token lifetime in seconds
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/resend-reset-code:
     post:
       tags: [Authentication]
@@ -264,6 +285,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/auth/v1/reset-password:
     post:
       tags: [Authentication]
@@ -299,6 +321,7 @@ paths:
           $ref: '#/components/responses/Success'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /api/worker/v1/update-worker-profile/{userId}:
     put:
       tags: [Worker Profiles]
@@ -340,6 +363,7 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /api/facility/v1/update-facility-profile:
     put:
       tags: [Facility Profiles]
@@ -362,22 +386,79 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
-
   /api/shifts/v1/create-shift:
     post:
-      tags: [Shifts]
-      summary: Create a shift
+      summary: Create a new shift
+      tags:
+        - Shifts
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ShiftInput'
+              type: object
+              required:
+                - profession
+                - shiftDate
+                - shiftType
+                - startTime
+                - endTime
+                - professionalsNeeded
+                - minimumExperience
+                - location
+                - payRate
+              properties:
+                profession:
+                  type: string
+                  example: Nurse
+                specialty:
+                  type: string
+                  example: General Nursing
+                shiftDate:
+                  type: string
+                  example: "2026-10-20"
+                shiftType:
+                  type: string
+                  example: Day
+                startTime:
+                  type: string
+                  example: "08:00"
+                endTime:
+                  type: string
+                  example: "20:00"
+                professionalsNeeded:
+                  type: integer
+                  minimum: 1
+                  example: 2
+                minimumExperience:
+                  type: string
+                  example: "2 years"
+                location:
+                  type: string
+                  example: "Akindele, Ikeja, Lagos, Nigeria"
+                responsibilities:
+                  type: string
+                  example: "Provide patient care and monitor vital signs"
+                reqCredentials:
+                  type: string
+                  example: "Valid professional license"
+                arrivalInstructions:
+                  type: string
+                  example: "Report to the facility reception"
+                payRate:
+                  type: number
+                  minimum: 0
+                  example: 50000
+                isUrgent:
+                  type: boolean
+                  example: false
       responses:
-        '201':
-          $ref: '#/components/responses/Success'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+        "201":
+         description: Shift created successfully
+        "400":
+          description: Invalid shift data or payment initiation failed
   /api/shifts/v1/get-shifts:
     get:
       tags: [Shifts]
@@ -395,7 +476,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
-  /api/shifts/v1/get-single-shift/{shiftId}:
+
+  /api/shifts/v1/get-shift/{shiftId}:
     get:
       tags: [Shifts]
       summary: Retrieve a shift by ID
@@ -406,6 +488,7 @@ paths:
           $ref: '#/components/responses/Success'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /api/shifts/v1/get-facility-shifts:
     get:
       tags: [Shifts]
@@ -413,6 +496,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/shifts/v1/update-shift/{shiftId}:
     put:
       tags: [Shifts]
@@ -430,6 +514,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/shifts/v1/close-shift/{shiftId}:
     patch:
       tags: [Shifts]
@@ -439,6 +524,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/shifts/v1/complete-shift/{shiftId}:
     patch:
       tags: [Shifts]
@@ -448,6 +534,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/shifts/v1/delete-shift/{shiftId}:
     delete:
       tags: [Shifts]
@@ -471,6 +558,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/applications/v1/my-applications:
     get:
       tags: [Shift Applications]
@@ -478,6 +566,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/applications/v1/facility-applications:
     get:
       tags: [Shift Applications]
@@ -485,6 +574,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/applications/v1/accept/{applicationId}:
     patch:
       tags: [Shift Applications]
@@ -494,6 +584,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/applications/v1/reject/{applicationId}:
     patch:
       tags: [Shift Applications]
@@ -513,6 +604,7 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Success'
+
   /api/attendance/v1/clock-in:
     post:
       tags: [Attendance]
@@ -531,6 +623,7 @@ paths:
           $ref: '#/components/responses/Success'
         '400':
           $ref: '#/components/responses/BadRequest'
+
   /api/attendance/v1/clock-out:
     post:
       tags: [Attendance]
@@ -778,6 +871,169 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
 
+  # CAREPORIUM payment endpoints
+  /api/payment/v1/harrenapay/webhook:
+    post:
+      tags: [Payments]
+      summary: Receive HarrenaPay payment webhook
+      description: >
+        Receives payment notifications from HarrenaPay. The request must contain
+        the original raw JSON body and a valid HMAC-SHA256 hexadecimal signature
+        in the x-harrenapay-signature header. Invalid signatures are rejected.
+      operationId: handleHarrenaPayWebhook
+      security: []
+      parameters:
+        - in: header
+          name: x-harrenapay-signature
+          required: true
+          description: HMAC-SHA256 hexadecimal signature of the original raw request body.
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{64}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: HarrenaPay webhook event payload; exact event fields depend on HarrenaPay's webhook schema.
+              additionalProperties: true
+      responses:
+        '200':
+          description: Webhook received and processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                success: true
+                message: Webhook received
+        '400':
+          description: Invalid webhook payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Invalid webhook payload
+        '401':
+          description: Missing or invalid webhook signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Invalid webhook signature
+        '500':
+          description: Unable to process webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Unable to process webhook
+
+  /api/payment/v1/retry/{shiftId}:
+    post:
+      tags: [Payments]
+      summary: Retry shift payment
+      description: Retries funding for an existing shift using its existing payment record. Only the facility that owns the shift can retry its payment.
+      operationId: retryShiftPayment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ShiftId'
+      responses:
+        '200':
+          description: Payment funding request processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: Payment funding request processed }
+                  data:
+                    type: object
+                    properties:
+                      shiftId: { type: string, example: 652abc123456789012345678 }
+                      payment:
+                        type: object
+                        description: Payment record returned by the payment service; fields depend on the Payment model and service.
+                        additionalProperties: true
+        '400':
+          description: Payment retry failed or request could not be processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Only facility accounts can retry shift payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Only facility accounts can retry shift payments
+        '404':
+          description: Facility or facility-owned shift not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                facilityNotFound:
+                  value:
+                    success: false
+                    message: Facility not found
+                shiftNotFound:
+                  value:
+                    success: false
+                    message: Shift not found for this facility
+
+  # External HarrenaPay sandbox endpoint; not hosted by CAREPORIUM
+  /api/public/v1/escrow/{reference}/simulate-fund:
+    post:
+      tags: [HarrenaPay Sandbox Testing]
+      summary: Simulate escrow funding in HarrenaPay sandbox
+      description: >
+        External HarrenaPay endpoint, not a CAREPORIUM backend route.
+        Use only for sandbox testing with a HarrenaPay test API key. Never
+        expose the secret API key in frontend or mobile application code.
+      operationId: simulateHarrenaPayEscrowFunding
+      servers:
+        - url: https://www.harrenapay.com
+          description: HarrenaPay API host
+      security:
+        - harrenapayApiKey: []
+      parameters:
+        - in: path
+          name: reference
+          required: true
+          description: HarrenaPay escrow reference to simulate funding for.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HarrenaPay accepted the simulation request. Confirm the exact response schema against HarrenaPay's current API reference.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid request or escrow reference
+        '401':
+          description: Invalid or missing HarrenaPay API key
+        '404':
+          description: Escrow reference not found
+
 components:
   securitySchemes:
     bearerAuth:
@@ -789,6 +1045,14 @@ components:
       scheme: bearer
       bearerFormat: ResetToken
       description: Temporary token returned by verify-reset-code. Use only for reset-password, not as a normal login JWT.
+    harrenapayApiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: HarrenaPay API key
+      description: >
+        HarrenaPay API key for server-to-server requests. Use a sandbox key
+        for sandbox testing and never expose it publicly.
+
   parameters:
     UserId:
       in: path
@@ -815,6 +1079,7 @@ components:
       name: applicationId
       required: true
       schema: { type: string }
+
   schemas:
     RegistrationResponse:
       type: object
@@ -826,6 +1091,7 @@ components:
             userId: { type: string }
             workerId: { type: string }
             facilityId: { type: string }
+
     UserSummary:
       type: object
       properties:
@@ -833,6 +1099,7 @@ components:
         email: { type: string, format: email }
         role: { type: string, enum: [worker, facility, admin] }
         isVerified: { type: boolean }
+
     Location:
       type: object
       properties:
@@ -841,6 +1108,7 @@ components:
         city: { type: string }
         state: { type: string }
         country: { type: string }
+
     SecondaryContact:
       type: object
       properties:
@@ -848,6 +1116,7 @@ components:
         position: { type: string }
         email: { type: string, format: email }
         phoneNumber: { type: string }
+
     ShiftInput:
       type: object
       required: [role, date, startTime, endTime]
@@ -868,6 +1137,7 @@ components:
         shiftType: { type: string }
         location:
           $ref: '#/components/schemas/Location'
+
     WorkerDocumentReviewInput:
       type: object
       required: [documentType, status]
@@ -884,6 +1154,7 @@ components:
           type: string
           description: Required when status is rejected.
           example: The uploaded document is unclear.
+
     FacilityDocumentReviewInput:
       type: object
       required: [documentType, status]
@@ -900,6 +1171,7 @@ components:
           type: string
           description: Required when status is rejected.
           example: The uploaded document is invalid.
+
     VerificationQueueItem:
       type: object
       properties:
@@ -911,17 +1183,20 @@ components:
         documentVerificationStatus: { type: string, enum: [pending] }
         verificationComment: { type: string }
         submittedAt: { type: string, format: date-time }
+
     SuccessResponse:
       type: object
       properties:
         success: { type: boolean, example: true }
         message: { type: string }
         data: {}
+
     ErrorResponse:
       type: object
       properties:
         success: { type: boolean, example: false }
         message: { type: string, example: Something went wrong }
+
   responses:
     Success:
       description: Request completed successfully
@@ -929,26 +1204,37 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/SuccessResponse'
+
     BadRequest:
       description: Invalid input or request could not be completed
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+
     Unauthorized:
       description: Authentication required or token invalid
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+
     Forbidden:
       description: User is not permitted to perform this action
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+
     NotFound:
       description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ServerError:
+      description: Internal server error
       content:
         application/json:
           schema:
