@@ -872,7 +872,7 @@ paths:
           $ref: '#/components/responses/ServerError'
 
   # CAREPORIUM payment endpoints
-  /api/payment/v1/harrenapay/webhook:
+  /api/payments/v1/harrenapay/webhook:
     post:
       tags: [Payments]
       summary: Receive HarrenaPay payment webhook
@@ -936,7 +936,7 @@ paths:
                 success: false
                 message: Unable to process webhook
 
-  /api/payment/v1/retry/{shiftId}:
+  /api/payments/v1/retry/{shiftId}:
     post:
       tags: [Payments]
       summary: Retry shift payment
