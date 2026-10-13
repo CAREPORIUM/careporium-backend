@@ -39,7 +39,7 @@ paths:
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
               required: [fullName, email, phoneNumber, password]
@@ -51,14 +51,11 @@ paths:
                 profession: { type: string, example: Nurse }
                 specialty: { type: string, example: Emergency }
                 yearsOfExperience: { type: integer, minimum: 0, example: 3 }
-                address: { type: string }
-                street: { type: string }
-                state: { type: string }
-                country: { type: string, example: Nigeria }
-                professionalLicense: { type: string, format: binary }
-                idDocument: { type: string, format: binary }
-                educationCert: { type: string, format: binary }
-                proofOfLocation: { type: string, format: binary }
+                location.address: { type: string }
+                location.city: { type: string }
+                location.state: { type: string }
+                location.country: { type: string, example: Nigeria }
+
       responses:
         '201':
           description: Worker account created; verification email sent
@@ -78,7 +75,7 @@ paths:
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
               required: [facilityName, facilityType, email, phoneNumber, password, businessRegCert, facilityLicense, taxID]
@@ -96,9 +93,6 @@ paths:
                 secondaryContact.position: { type: string }
                 secondaryContact.email: { type: string, format: email }
                 secondaryContact.phoneNumber: { type: string }
-                businessRegCert: { type: string, format: binary }
-                facilityLicense: { type: string, format: binary }
-                taxID: { type: string, format: binary }
       responses:
         '201':
           description: Facility account created; verification email sent
