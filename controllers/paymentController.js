@@ -7,15 +7,10 @@ import Shift from '../models/shiftModel.js';
 // verify the signature sent by HarrenaPay
 const verifyHarrenaPaySignature = (rawBody, signature, secret) => {
 
-    if (
-        !signature ||
-        !secret ||
-        !Buffer.isBuffer(rawBody)
-    ) {
+    if (!signature || !secret || !Buffer.isBuffer(rawBody)) {
         return false;
     }
 
-    // validate the expected SHA-256 hexadecimal signature format
     if (!/^[a-fA-F0-9]{64}$/.test(signature)) {
         return false;
     }
@@ -25,42 +20,29 @@ const verifyHarrenaPaySignature = (rawBody, signature, secret) => {
         .update(rawBody)
         .digest('hex');
 
-    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-    const receivedBuffer = Buffer.from(signature, 'hex');
-
-    // compare signatures safely to prevent timing attacks
     return crypto.timingSafeEqual(
-        expectedBuffer,
-        receivedBuffer
+        Buffer.from(expectedSignature, 'hex'),
+        Buffer.from(signature, 'hex')
     );
 };
-
 
 // handle webhook notifications from HarrenaPay
 const handleHarrenaPayWebhook = async (req, res) => {
 
     try {
-
-        const webhookSecret = process.env.HARRENAPAY_WEBHOOK_SECRET;
-
-        // read the signature sent by HarrenaPay
         const signature = req.get('x-harrenapay-signature');
 
-        // reject webhooks with invalid signatures
-        const isValid = verifyHarrenaPaySignature(
+        if (!verifyHarrenaPaySignature(
             req.body,
             signature,
-            webhookSecret
-        );
-
-        if (!isValid) {
+            process.env.HARRENAPAY_WEBHOOK_SECRET
+        )) {
             return res.status(401).json({
                 success: false,
                 message: 'Invalid webhook signature'
             });
         }
 
-        // parse the original request body after signature verification
         let event;
 
         try {
@@ -72,35 +54,28 @@ const handleHarrenaPayWebhook = async (req, res) => {
             });
         }
 
-        // process the verified webhook
-        await paymentService.handleHarrenaPayWebhook(event);
+        const result =
+            await paymentService.handleHarrenaPayWebhook(event);
 
         return res.status(200).json({
             success: true,
-            message: 'Webhook received'
+            message: 'Webhook received',
+            data: result
         });
-
     } catch (error) {
+        console.error('HarrenaPay webhook error:', error.message);
 
-        console.error(
-            'HarrenaPay webhook error:',
-            error.message
-        );
-
-        return res.status(500).json({
+        return res.status(error.statusCode || 500).json({
             success: false,
-            message: 'Unable to process webhook'
+            message: error.message || 'Unable to process webhook'
         });
     }
 };
-
 
 // retry funding for an existing shift
 const retryShiftPayment = async (req, res) => {
 
     try {
-
-        // allow only facility accounts to retry shift funding
         if (req.user.role !== 'facility') {
             return res.status(403).json({
                 success: false,
@@ -108,7 +83,6 @@ const retryShiftPayment = async (req, res) => {
             });
         }
 
-        // find the facility belonging to the logged-in user
         const facility = await Facility.findOne({
             user: req.user.id
         });
@@ -120,7 +94,6 @@ const retryShiftPayment = async (req, res) => {
             });
         }
 
-        // find the shift belonging to this facility
         const shift = await Shift.findOne({
             _id: req.params.shiftId,
             facility: facility._id
@@ -133,7 +106,6 @@ const retryShiftPayment = async (req, res) => {
             });
         }
 
-        // retry funding using the existing payment record
         const payment = await paymentService.retryShiftPayment({
             shift,
             facility
@@ -142,32 +114,20 @@ const retryShiftPayment = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: 'Payment funding request processed',
-            data: {
-                shiftId: shift._id,
-                payment
-            }
+            data: { shiftId: shift._id, payment }
         });
-
     } catch (error) {
-
-        console.error(
-            'Retry shift payment error:',
-            error.message
-        );
-
         return res.status(error.statusCode || 400).json({
             success: false,
-            message: error.message ||
-                'Unable to retry shift payment',
-            shiftId: error.shiftId
+            message: error.message || 'Unable to retry shift payment'
         });
     }
 };
 
-// handles retrieval of payment history for a facility
+// retrieve payment history for a facility
 const getPaymentHistory = async (req, res) => {
-    try {
 
+    try {
         if (req.user.role !== 'facility') {
             return res.status(403).json({
                 success: false,
@@ -186,33 +146,25 @@ const getPaymentHistory = async (req, res) => {
             });
         }
 
-        const page = Math.max(
-            1,
-            parseInt(req.query.page, 10) || 1
-        );
-
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
         const limit = Math.min(
             50,
             Math.max(1, parseInt(req.query.limit, 10) || 10)
         );
 
-        const payments = await Payment.find({
-            facility: facility._id
-        })
-            .populate(
-                'shift',
-                'profession shiftDate shiftType status'
-            )
-            .sort({ createdAt: -1 })
-            .skip((page - 1) * limit)
-            .limit(limit)
-            .select(
-                'shift amountKobo currency platformCommissionAmountKobo workerPayoutAmountKobo provider providerReference checkoutUrl virtualAccountNumber bankName expiresAt fundingStatus completionStatus payoutStatus providerEscrowStatus disputeStatus workerPayouts createdAt fundedAt completionConfirmedAt paidAt'
-            );
+        const filter = { facility: facility._id };
 
-        const total = await Payment.countDocuments({
-            facility: facility._id
-        });
+        const [payments, total] = await Promise.all([
+            Payment.find(filter)
+                .populate('shift', 'profession shiftDate shiftType status')
+                .sort({ createdAt: -1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .select(
+                    'shift amountKobo currency platformCommissionAmountKobo workerPayoutAmountKobo provider providerReference checkoutUrl virtualAccountNumber bankName expiresAt fundingStatus completionStatus payoutStatus providerEscrowStatus disputeStatus workerPayouts createdAt fundedAt completionConfirmedAt paidAt'
+                ),
+            Payment.countDocuments(filter)
+        ]);
 
         return res.status(200).json({
             success: true,
@@ -227,7 +179,6 @@ const getPaymentHistory = async (req, res) => {
                 }
             }
         });
-
     } catch (error) {
         return res.status(500).json({
             success: false,
@@ -236,11 +187,10 @@ const getPaymentHistory = async (req, res) => {
     }
 };
 
-
-// handles retrieval of payment status for a shift
+// retrieve payment status for a shift
 const getShiftPaymentStatus = async (req, res) => {
-    try {
 
+    try {
         if (req.user.role !== 'facility') {
             return res.status(403).json({
                 success: false,
@@ -263,10 +213,7 @@ const getShiftPaymentStatus = async (req, res) => {
             shift: req.params.shiftId,
             facility: facility._id
         })
-            .populate(
-                'shift',
-                'profession shiftDate shiftType status'
-            )
+            .populate('shift', 'profession shiftDate shiftType status')
             .select(
                 'shift amountKobo currency platformCommissionAmountKobo workerPayoutAmountKobo provider providerReference checkoutUrl virtualAccountNumber bankName expiresAt fundingStatus completionStatus payoutStatus providerEscrowStatus disputeStatus workerPayouts createdAt fundedAt completionConfirmedAt paidAt'
             );
@@ -283,9 +230,100 @@ const getShiftPaymentStatus = async (req, res) => {
             message: 'Shift payment status retrieved successfully',
             data: payment
         });
-
     } catch (error) {
         return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// simulate HarrenaPay sandbox funding
+const simulateSandboxFunding = async (req, res) => {
+
+    try {
+        if (req.user.role !== 'facility') {
+            return res.status(403).json({
+                success: false,
+                message: 'Only facilities can simulate sandbox funding'
+            });
+        }
+
+        const facility = await Facility.findOne({
+            user: req.user.id
+        });
+
+        if (!facility) {
+            return res.status(404).json({
+                success: false,
+                message: 'Facility profile not found'
+            });
+        }
+
+        const payment = await Payment.findOne({
+            shift: req.params.shiftId,
+            facility: facility._id,
+            provider: 'harrenapay'
+        });
+
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                message: 'HarrenaPay payment not found'
+            });
+        }
+
+        await paymentService.simulateHarrenaPaySandboxFunding(
+            payment._id
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: 'Sandbox funding simulation requested. Funding status is confirmed by webhook or provider reconciliation.'
+        });
+    } catch (error) {
+        return res.status(error.statusCode || 400).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// simulate a worker payout for development testing only
+const simulateWorkerPayout = async (req, res) => {
+
+    try {
+        if (req.user.role !== 'facility') {
+            return res.status(403).json({
+                success: false,
+                message: 'Only facilities can initiate this test action'
+            });
+        }
+
+        const facility = await Facility.findOne({
+            user: req.user.id
+        });
+
+        if (!facility) {
+            return res.status(404).json({
+                success: false,
+                message: 'Facility profile not found'
+            });
+        }
+
+        const result = await paymentService.simulateWorkerPayout({
+            shiftId: req.params.shiftId,
+            workerId: req.params.workerId,
+            facility
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Development payout simulation completed',
+            data: result
+        });
+    } catch (error) {
+        return res.status(error.statusCode || 400).json({
             success: false,
             message: error.message
         });
@@ -296,5 +334,7 @@ export default {
     handleHarrenaPayWebhook,
     retryShiftPayment,
     getPaymentHistory,
-    getShiftPaymentStatus
+    getShiftPaymentStatus,
+    simulateSandboxFunding,
+    simulateWorkerPayout
 };
