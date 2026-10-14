@@ -1,7 +1,8 @@
 import { getFacilityProfile, updateFacilityProfile } from '../services/facilityService.js';
 
-// receives the retrieve facility's profile request and passes the request data to the...
-// ...getFacilityProfile service in facilityService.js, which handles the retrieval logic 
+// GET /get-profile — fetch the signed-in facility's profile.
+// Passes the authenticated user id (req.user.id) to the facility service, which
+// handles retrieval and populate logic. Returns 404 if no profile exists.
 const getFProfile = async (req, res) => {
     try {
         const facility = await getFacilityProfile(req.user.id);
@@ -19,8 +20,8 @@ const getFProfile = async (req, res) => {
     }
 };
 
-// receives the update worker's profile request and passes the request data to the...
-// ...updateWorkerProfile service in workerService.js, which handles the update logic 
+// PUT /update-profile/:userId — update the signed-in facility's profile.
+// The service only applies allow-listed fields; returns 400 on failure.
 const updateFProfile = async (req, res) => {
     try {
         const facility = await updateFacilityProfile(

@@ -1,10 +1,19 @@
 import Worker from '../models/workerModel.js';
 
-// handles retrieval of worker's profile
+// ---------------------------------------------------------------------------
+// Worker profile service
+// ---------------------------------------------------------------------------
+// Reads and updates the signed-in worker's profile. Updates are restricted to
+// an allow-list of fields so callers can't modify protected data, and the
+// linked user document is populated (with sensitive fields excluded) on return.
+// ---------------------------------------------------------------------------
+
+// Fetch a worker profile by the owning user's id, including the linked user
+// record but excluding sensitive fields (password, OTP).
 const getWorkerProfile = async (userId) => {
-    const worker = await Worker.findOne({ 
-        user: userId 
-    }).populate("user", 
+    const worker = await Worker.findOne({
+        user: userId
+    }).populate("user",
                 "-password -verificationOtp -verificationOtpExpires");
 
     if (!worker) {
@@ -14,7 +23,8 @@ const getWorkerProfile = async (userId) => {
     return worker;
 };
 
-// handles updating of worker's profile
+// Update a worker profile. Only allow-listed fields provided in the request are
+// applied; schema validators still run on the update.
 const updateWorkerProfile = async (userId, updateData) => {
     // only allow these worker profile fields to be updated
     const allowedFields = [

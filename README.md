@@ -282,6 +282,64 @@ Expected response:
 
 The health endpoint can be used to quickly confirm that the backend server is running.
 
+## Shift Completion and Optional Ratings
+
+A worker applies for a shift and the facility selects an applicant through the shift-application workflow. That acceptance flow must set the shift's `assignedWorker` to the selected Worker document ID and move it to `in_progress`. Each participant then independently confirms the work is complete. Either participant may optionally rate the other after both confirmations; no rating is required to complete the shift.
+
+1. The facility and assigned worker each confirm completion:
+
+    `POST /api/shifts/v1/:shiftId/complete` with that participant's Bearer token and no request body. The first confirmation waits; the second changes the shift status to `completed`.
+
+2. Either participant may submit their optional rating:
+
+    `POST /api/ratings/v1/shifts/:shiftId` with a Bearer token and JSON `{ "rating": 5, "comment": "Optional feedback" }`. Rating is an integer from 1 to 5; the comment is optional and limited to 1000 characters. Each participant may submit one rating per shift.
+
+3. Participants can retrieve the ratings for that shift:
+
+    `GET /api/ratings/v1/shifts/:shiftId` with a Bearer token belonging to the worker or facility on the shift.
+
+4. Public profile summaries are available at `GET /api/ratings/v1/workers/:workerId` and `GET /api/ratings/v1/facilities/:facilityId`. Both support `page` and `limit` query parameters.
+
+The assignment endpoint is intentionally not part of this ratings feature. The rating API trusts only the authenticated user's role and the worker/facility references on the accepted shift, not participant IDs from the rating request body.
+
+## B6 Reviews API
+
+Reviews are shift-scoped and role-specific. Every review endpoint requires an `Authorization: Bearer <token>` header. A shift must be `completed` (both parties confirmed) before either side can review, and reviews must be submitted within 14 days of completion. Each participant may leave at most one review per shift.
+
+### `POST /api/reviews/v1/facility/{shiftId}` — worker rates the facility
+
+Only the worker who attended the completed shift may call this.
+
+```json
+{
+  "rating": 5,
+  "workEnvironment": 5,
+  "shiftAccuracy": 4,
+  "staffSupport": 5,
+  "paymentExperience": 5,
+  "text": "Great handover and a supportive team."
+}
+```
+
+All star values are integers from 1 to 5. `workEnvironment`, `shiftAccuracy`, `staffSupport` and `paymentExperience` are optional; `rating` and `text` are the only required fields. Returns the created review under `data`.
+
+### `GET /api/reviews/v1/facility/{facilityId}` — facility reviews page
+
+Available to logged-in workers. Returns the facility's name, location, overall `rating`, `reviewCount`, the four category averages, and a list of reviews. Worker names are masked to a first name and last initial (for example `Amara O.`), and each review shows the worker's `profession`, `rating`, `date` (`YYYY-MM-DD`) and `text`.
+
+### `POST /api/reviews/v1/worker/{shiftId}/{workerId}` — facility rates the worker
+
+Only the facility that owns the completed shift may call this. `{workerId}` must match the worker assigned to the shift.
+
+```json
+{
+  "rating": 5,
+  "text": "Punctual, clear handover."
+}
+```
+
+Returns the created review together with the worker's public stats (`rating`, `completedShifts`, `attendanceRate`, `noShows90Days`) under `data`.
+
 ---
 
 # Environment Variables

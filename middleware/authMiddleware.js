@@ -1,44 +1,49 @@
 import jwt from "jsonwebtoken";
 
-
-// authenticates user before authorization (allowing access to protected routes)
+// Authentication middleware — runs before authorization (protecting routes).
+// Verifies the "Authorization: Bearer <token>" header and, on success, attaches
+// the decoded token payload (which includes the user id and role) to req.user.
+// Route handlers and services then rely on req.user to identify the caller.
 const authMiddleware = (req, res, next) => {
 
     try {
-        // get the authorization header from the request
+        // Read the Authorization header from the incoming request.
         const authHeader = req.headers.authorization;
 
-        // stop the request if no authorization header was provided
+        // Reject the request if no Authorization header was provided.
         if (!authHeader) {
             return res.status(401).json({
                 message: "Authorization header missing"
             });
         }
 
-        // extract the token from "Bearer <token>"
+        // Extract the token from the "Bearer <token>" format.
         const token = authHeader.split(" ")[1];
 
-        // stop the request if a token was not provided
+        // Reject if the header existed but no token followed "Bearer".
         if (!token) {
             return res.status(401).json({
                 message: "Token missing"
             });
         }
 
-        // verify that the token is valid and has not expired
+        // Verify the token's signature and expiry using the server secret.
+        // Throws if the token is invalid or expired.
         const decoded = jwt.verify(
             token,
             process.env.JWT_SECRET
         );
 
-        // store the decoded user information so the controller/service can identify the user making the request
+        // Store the decoded user info so downstream code can identify the user.
+        // Typically contains { id, role }.
         req.user = decoded;
 
-        // token is valid, so allow the request to continue
+        // Token is valid — pass control to the next middleware/route handler.
         next();
 
     } catch (error) {
 
+        // Any verification failure (bad signature, expired, malformed) is a 401.
         return res.status(401).json({
             message: "Invalid or expired token"
         });

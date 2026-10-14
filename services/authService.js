@@ -1,3 +1,11 @@
+// ---------------------------------------------------------------------------
+// Authentication service
+// ---------------------------------------------------------------------------
+// Contains the business logic behind the auth endpoints: registration, email
+// verification (OTP), login (JWT issuance) and account deletion. It talks to
+// the User, Worker and Facility models and the email transporter.
+// Passwords are always stored bcrypt-hashed; JWTs carry { id, role }.
+// ---------------------------------------------------------------------------
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
@@ -6,7 +14,8 @@ import Facility from '../models/facilityModel.js';
 import cloudinary from '../config/cloudinary.js';
 import { transporter } from './emailService.js';
 
-// register worker
+// Register a new worker: create the account, generate + email an OTP, then
+// create the worker profile. Rolls back both records if the email fails.
 const registerWorker = async (workerData) => {
 
     const {
@@ -44,13 +53,13 @@ const registerWorker = async (workerData) => {
     });
 
 
-    // generate OTP
+    // generate a 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     // OTP expires in 5 minutes
     const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
 
-    // save OTP
+    // save OTP on the user record
     user.verificationOtp = otp;
     user.verificationOtpExpires = otpExpires;
 
@@ -101,8 +110,9 @@ const registerWorker = async (workerData) => {
 
 
 
-// register facility
-
+// Register a new facility: validate required uploads, upload the three
+// verification documents to Cloudinary, create the account + profile, and
+// email an OTP. Rolls back the created records if the email fails.
 const registerFacility = async (req) => {
     const {
         facilityName,
@@ -230,7 +240,9 @@ const registerFacility = async (req) => {
     };
 };
 
-// verify user account
+// Verify a user's account using the emailed OTP. Checks the code exists, has
+// not expired, and matches; on success marks the account verified and clears
+// the OTP fields.
 const verifyAccount = async (email, otp) => {
     const user = await User.findOne({ email });
     if (!user) {
@@ -269,7 +281,8 @@ const verifyAccount = async (email, otp) => {
 
 
 
-// resend verification OTP
+// Resend the verification OTP to an unverified account. Generates a fresh code
+// with a new 5-minute expiry and emails it.
 const resendVerificationOtp = async (email) => {
     const user = await User.findOne({ email });
     if (!user) {
@@ -302,8 +315,8 @@ const resendVerificationOtp = async (email) => {
     };
 };
 
-// login user
-
+// Authenticate a user by email + password. On success returns a signed JWT
+// (containing the user id and role) along with basic user info.
 const loginUser = async (loginData) => {
     const {
         email,
@@ -311,20 +324,28 @@ const loginUser = async (loginData) => {
     } = loginData;
     
     const user = await User.findOne({ email });
-    const isPasswordValid = await bcrypt.compare(password, user.password); // encrypt and compare password
-    
-    if (!user || !isPasswordValid) {
-        throw new Error('Invalid email or password');
-      }
 
-    /* * // check account verification
+    // Look up the user FIRST. Accessing user.password before this check would
+    // crash with a TypeError when the email does not exist.
+    if (!user) {
+        throw new Error('Invalid email or password');
+    }
+
+    // Compare the provided password against the stored bcrypt hash.
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+        throw new Error('Invalid email or password');
+    }
+
+    // Require a verified account before issuing a token.
     if (!user.isVerified) {
         throw new Error(
             'Your account is not verified. Please check your email for your verification code.'
         );
-    }  */
+    }
 
-    // Generate JWT
+    // Generate JWT. Fall back to a 7-day expiry when JWT_EXPIRES_IN is not set,
+    // because jwt.sign() throws if expiresIn is undefined.
     const token = jwt.sign(
         {
             id: user._id,
@@ -332,7 +353,7 @@ const loginUser = async (loginData) => {
         },
         process.env.JWT_SECRET,
         {
-            expiresIn: process.env.JWT_EXPIRES_IN
+            expiresIn: process.env.JWT_EXPIRES_IN || "7d"
         }
     );
 

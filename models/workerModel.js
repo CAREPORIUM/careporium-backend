@@ -1,12 +1,22 @@
 import mongoose from 'mongoose';
 
+// Mongoose schema for a Worker profile. Linked one-to-one with a User account
+// via the `user` field. Holds the professional details a facility sees when
+// reviewing applicants, plus optional certifications.
+// NOTE: `state` is restricted to the 36 Nigerian states + FCT.
 const workerSchema = new mongoose.Schema(
     {
+        // Reference to the owning User account (one profile per user).
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+        // Worker's full name (required).
         fullName: { type: String, required: true, trim: true },
+        // Job profession, e.g. "Registered Nurse".
         profession: { type: String },
+        // Optional area of specialty within the profession.
         specialty: { type: String },
+        // Years of professional experience (non-negative).
         yearsOfExperience: { type: Number, min: 0 },
+        // Where the worker is based.
         location: { address: { type: String }, street: { type: String }, state: { type: String,
             enum: [
             "Abia",
@@ -53,11 +63,11 @@ const workerSchema = new mongoose.Schema(
                 url: { type: String, default: "" },
                 verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
                 verifiedAt: { type: Date }},
-            professionalLicense: {
+            cprCertification: {
                 url: { type: String, default: "" },
                 verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
                 verifiedAt: { type: Date }},
-            professionalLicense: {
+            backgroundCheck: {
                 url: { type: String, default: "" },
                 verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending"},
                 verifiedAt: { type: Date }} 

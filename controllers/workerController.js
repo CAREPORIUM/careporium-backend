@@ -1,7 +1,8 @@
 import { getWorkerProfile, updateWorkerProfile } from '../services/workerService.js';
 
-// receives the retrieve worker's profile request and passes the request data to the...
-// ...getWorkerProfile service in workerService.js, which handles the retrieval logic 
+// GET /get-worker-profile — fetch the signed-in worker's profile.
+// Passes the authenticated user id (req.user.id) to the worker service, which
+// handles retrieval and populate logic. Returns 404 if no profile exists.
 const getWProfile = async (req, res) => {
     try {
         const worker = await getWorkerProfile(req.user.id);
@@ -19,8 +20,8 @@ const getWProfile = async (req, res) => {
     }
 };
 
-// receives the update worker's profile request and passes the request data to the...
-// ...updateWorkerProfile service in workerService.js, which handles the update logic 
+// PUT /update-worker-profile/:userId — update the signed-in worker's profile.
+// The service only applies allow-listed fields; returns 400 on failure.
 const updateWProfile = async (req, res) => {
     try {
         const worker = await updateWorkerProfile(
