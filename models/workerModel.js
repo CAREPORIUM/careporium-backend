@@ -85,6 +85,45 @@ const workerSchema = new mongoose.Schema(
         verifiedAt: { type: Date },
       },
     },
+
+            // Worker bank details for receiving shift payments
+        payoutBankName: {
+            type: String,
+            trim: true,
+            default: null
+        },
+
+        payoutBankCode: {
+            type: String,
+            trim: true,
+            default: null
+        },
+
+        payoutAccountNumber: {
+            type: String,
+            trim: true,
+            select: false,
+            default: null
+        },
+
+        payoutAccountName: {
+            type: String,
+            trim: true,
+            default: null
+        },
+
+        // Paystack recipient code used for worker transfers
+        paystackRecipientCode: {
+            type: String,
+            select: false,
+            default: null
+        },
+
+        // Indicates whether the saved bank details have been verified
+        payoutDetailsVerified: {
+            type: Boolean,
+            default: false
+        },
     verificationStatus: { type: String, enum: ["pending", "verified"], default: "pending" },
     verifiedAt: { type: Date },
     about: { type: String },

@@ -13,11 +13,11 @@ router.post('/verify-account', verifyAccountController);
 router.post('/resend-otp', resendVerificationOtpController);
 router.post('/login', loginUserController);
 router.post('/logout', authMiddleware, logoutUserController);
-router.get('/get-profile/:userId', authMiddleware, getProfileController);
+router.get('/get-profile', authMiddleware, getProfileController);
 router.post('/forgot-password', forgotPasswordController);
 router.post('/verify-reset-code', verifyResetCodeController);
 router.post('/resend-reset-code', resendResetCodeController);
 router.post('/reset-password', resetPasswordController);
-router.delete('/delete-profile/:userId', authMiddleware, deleteUserController);
+router.delete('/delete-profile/:userId', deleteUserController);
 
 export default router;

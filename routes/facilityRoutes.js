@@ -7,15 +7,7 @@ const router = express.Router()
 
 router.get('/get-facility-profile', authMiddleware, getFProfile);
 
-router.put(
-    '/update-facility-profile',
-    authMiddleware,
-    upload.fields([
-        { name: 'businessRegCert', maxCount: 1 },
-        { name: 'facilityLicense', maxCount: 1 },
-        { name: 'taxID', maxCount: 1 }
-    ]),
-    updateFProfile
-);
+router.put('/update-facility-profile', authMiddleware, upload.fields([{ name: 'businessRegCert', maxCount: 1 },
+           { name: 'facilityLicense', maxCount: 1 }, { name: 'taxID', maxCount: 1 }]), updateFProfile);
 
 export default router;

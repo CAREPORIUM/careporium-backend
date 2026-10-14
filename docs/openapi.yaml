@@ -303,12 +303,10 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/worker/v1/get-worker-profile/{userId}:
+  /api/worker/v1/get-worker-profile:
     get:
       tags: [Worker Profiles]
       summary: Get a worker profile
-      parameters:
-        - $ref: '#/components/parameters/UserId'
       responses:
         '200':
           $ref: '#/components/responses/Success'
