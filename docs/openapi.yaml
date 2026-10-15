@@ -1026,27 +1026,6 @@ paths:
   # PAYMENTS
   # =========================
 
-  /api/payments/v1/verify/{shiftId}:
-    post:
-      tags: [Payments]
-      summary: Verify a shift payment with Paystack
-      description: The backend verifies the transaction with Paystack before treating payment as successful.
-      parameters:
-        - $ref: '#/components/parameters/ShiftId'
-      responses:
-        '200':
-          $ref: '#/components/responses/Success'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
   /api/payments/v1/retry/{shiftId}:
     post:
       tags: [Payments]
