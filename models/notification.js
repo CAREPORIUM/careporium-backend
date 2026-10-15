@@ -25,6 +25,8 @@ const notificationSchema = new mongoose.Schema(
     "SHIFT_STARTING_SOON",
     "URGENT_SHIFT_UNFILLED",
     "SHIFT_COMPLETION_CONFIRMATION_REQUIRED",
+    "FACILITY_DOCUMENT_STATUS_UPDATED",
+    "SHIFT_CLOCK_OUT_REMINDER"
   ],
 },
     title: {
@@ -37,6 +39,14 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    actionText: {
+  type: String,
+  trim: true,
+    },
+   actionLink: {
+  type: String,
+  trim: true,
+   },
     isRead: {
       type: Boolean,
       default: false,

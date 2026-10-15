@@ -5,6 +5,7 @@ import Application from "../models/applicationModel.js";
 import Worker from "../models/workerModel.js";
 import Facility from "../models/facilityModel.js";
 import { createNotification } from "./notificationService.js";
+import Attendance from "../models/attendanceModel.js";
 
 const REMINDER_WINDOWS = [
   { type: "24_hours", milliseconds: 24 * 60 * 60 * 1000 },
@@ -131,6 +132,8 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
                   "Please review the shift and arrange cover.",
                 resourceType: "Shift",
                 resourceId: shift._id,
+                actionText: "Review shift",
+                actionLink: `/FacilityHiringSection/ShiftDetails.html?shift=${shift._id}`,
               });
 
               console.log("[URGENT REMINDER] Notification saved:", {
@@ -233,6 +236,8 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
               `Arrival guidance: ${arrivalGuidance}. Check Shift Details.`,
             resourceType: "Shift",
             resourceId: shift._id,
+            actionText: "View shift",
+            actionLink: `/WorkerShiftMarket/UpcomingShifts.html?shift=${shift._id}`,
           });
         } catch (error) {
           try {
@@ -319,6 +324,8 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
             } booked. Check Shift Details.`,
           resourceType: "Shift",
           resourceId: shift._id,
+          actionText: "View shift",
+          actionLink: `/FacilityHiringSection/ShiftDetails.html?shift=${shift._id}`,
         });
       } catch (error) {
         try {
@@ -348,16 +355,166 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
   }
 };
 
-const startShiftReminderScheduler = () => {
-  cron.schedule("* * * * *", async () => {
-    try {
-      await sendShiftReminders();
-    } catch (error) {
-      console.error("[REMINDER] Scheduled job failed:", error);
+const sendClockOutReminders = async ({ now = Date.now(), shiftId } = {}) => {
+  const shiftQuery = { status: "filled" };
+
+  if (shiftId) {
+    shiftQuery._id = shiftId;
+  }
+
+  const shifts = await Shift.find(shiftQuery);
+
+  for (const shift of shifts) {
+    if (!shift.endTime || !shift.shiftDate) continue;
+
+    const [endHours, endMinutes] = shift.endTime.split(":").map(Number);
+
+    if (
+      !Number.isInteger(endHours) ||
+      !Number.isInteger(endMinutes) ||
+      endHours < 0 ||
+      endHours > 23 ||
+      endMinutes < 0 ||
+      endMinutes > 59
+    ) {
+      console.error(`Invalid endTime for shift ${shift._id}`);
+      continue;
     }
-  });
+
+    const shiftDate = DateTime.fromISO(shift.shiftDate, {
+      zone: "utc",
+    }).toISODate();
+
+    if (!shiftDate) {
+      console.error(`Invalid shiftDate for shift ${shift._id}`);
+      continue;
+    }
+
+    const startHours = Number(shift.startTime?.split(":")[0]);
+    const endsNextDay =
+      endHours * 60 + endMinutes <=
+      startHours * 60 + Number(shift.startTime?.split(":")[1] || 0);
+
+    let shiftEndsAt = DateTime.fromISO(
+      `${shiftDate}T${shift.endTime}`,
+      { zone: "Africa/Lagos" }
+    );
+
+    if (endsNextDay) {
+      shiftEndsAt = shiftEndsAt.plus({ days: 1 });
+    }
+
+    if (!shiftEndsAt.isValid || shiftEndsAt.toMillis() > now) continue;
+
+    const facility = await Facility.findById(shift.facility);
+    const facilityName = facility?.facilityName || "the facility";
+
+    for (const workerId of shift.assignedWorkers ?? []) {
+      const attendance = await Attendance.findOne({
+        worker: workerId,
+        shift: shift._id,
+        clockInTime: { $exists: true, $ne: null },
+        $or: [
+          { clockOutTime: { $exists: false } },
+          { clockOutTime: null },
+        ],
+      });
+
+      if (!attendance) continue;
+
+      const worker = await Worker.findById(workerId);
+      if (!worker?.user) continue;
+
+      const claimedShift = await Shift.findOneAndUpdate(
+        {
+          _id: shift._id,
+          status: "filled",
+          assignedWorkers: workerId,
+          remindersSent: {
+            $not: {
+              $elemMatch: {
+                worker: workerId,
+                reminderType: "clock_out",
+              },
+            },
+          },
+        },
+        {
+          $push: {
+            remindersSent: {
+              worker: workerId,
+              reminderType: "clock_out",
+              sentAt: new Date(now),
+            },
+          },
+        },
+        { new: true }
+      );
+
+      if (!claimedShift) continue;
+
+      try {
+        await createNotification({
+          recipient: worker.user,
+          type: "SHIFT_CLOCK_OUT_REMINDER",
+          title: "Time to clock out",
+          message:
+            `Your ${shift.profession} shift at ${facilityName} has reached its scheduled end time. ` +
+            "Please clock out to record your completed hours.",
+          resourceType: "Shift",
+          resourceId: shift._id,
+          actionText: "View shift",
+          actionLink: `/WorkerShiftMarket/UpcomingShifts.html?shift=${shift._id}`,
+        });
+      } catch (error) {
+        try {
+          await Shift.updateOne(
+            { _id: shift._id },
+            {
+              $pull: {
+                remindersSent: {
+                  worker: workerId,
+                  reminderType: "clock_out",
+                },
+              },
+            }
+          );
+        } catch (cleanupError) {
+          console.error(
+            `[CLOCK-OUT REMINDER] Failed to reset marker for shift ${shift._id}:`,
+            cleanupError
+          );
+        }
+
+        console.error(
+          `[CLOCK-OUT REMINDER] Failed for shift ${shift._id}, worker ${workerId}:`,
+          error
+        );
+      }
+    }
+  }
+};
+
+const startShiftReminderScheduler = () => {
+cron.schedule("* * * * *", async () => {
+  try {
+    await sendShiftReminders();
+  } catch (error) {
+    console.error("[REMINDER] Scheduled shift reminders failed:", error);
+  }
+
+  try {
+    await sendClockOutReminders();
+  } catch (error) {
+    console.error("[CLOCK-OUT REMINDER] Scheduled job failed:", error);
+  }
+});
 
   console.log("Shift reminder scheduler started.");
 };
 
-export { startShiftReminderScheduler, sendShiftReminders };
+export {
+  startShiftReminderScheduler,
+  sendShiftReminders,
+  sendClockOutReminders,
+};

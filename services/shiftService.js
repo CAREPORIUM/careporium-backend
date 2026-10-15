@@ -6,47 +6,55 @@ import Attendance from "../models/attendanceModel.js";
 import Worker from "../models/workerModel.js"
 
 // create a new shift under a facility's profile
+
 const createShift = async (userId, shiftData) => {
-    const facility = await Facility.findOne({
-        user: userId
-    });
+    const facility = await Facility.findOne({ user: userId });
 
     if (!facility) {
         throw new Error("Facility not found for this user");
     }
 
     const shift = await Shift.create({
-
-    facility: facility._id,
-    profession: shiftData.profession,
-    specialty: shiftData.specialty,
-    shiftDate: shiftData.shiftDate,
-    shiftType: shiftData.shiftType,
-    startTime: shiftData.startTime,
-    endTime: shiftData.endTime,
-    professionalsNeeded: shiftData.professionalsNeeded,
-    minimumExperience: shiftData.minimumExperience,
-    location: shiftData.location,
-    responsibilities: shiftData.responsibilities,
-    reqCredentials: shiftData.reqCredentials,
-    arrivalInstructions: shiftData.arrivalInstructions,
-    payRate: shiftData.payRate,
-    isUrgent: shiftData.isUrgent,
+        facility: facility._id,
+        profession: shiftData.profession,
+        specialty: shiftData.specialty,
+        shiftDate: shiftData.shiftDate,
+        shiftType: shiftData.shiftType,
+        startTime: shiftData.startTime,
+        endTime: shiftData.endTime,
+        professionalsNeeded: shiftData.professionalsNeeded,
+        minimumExperience: shiftData.minimumExperience,
+        location: shiftData.location,
+        responsibilities: shiftData.responsibilities,
+        reqCredentials: shiftData.reqCredentials,
+        arrivalInstructions: shiftData.arrivalInstructions,
+        payRate: shiftData.payRate,
+        isUrgent: shiftData.isUrgent,
     });
 
     const workers = await User.find({ role: "worker" }).select("_id");
 
-    await Promise.allSettled(workers.map((worker) => createNotification({
-        recipient: worker._id,
-        type: "SHIFT_POSTED",
-        title: "New shift available",
-        message: "A new " + shift.profession + " shift is available. View the details and apply if interested.",
-        resourceType: "Shift",
-        resourceId: shift._id,
-    })));
+    await Promise.allSettled(
+        workers.map((worker) =>
+            createNotification({
+                recipient: worker._id,
+                type: "SHIFT_POSTED",
+                title: "New shift available",
+                message:
+                    "A new " +
+                    shift.profession +
+                    " shift is available. View the details and apply if interested.",
+                actionText: "View shift",
+                actionLink: `/WorkerShiftMarket/UpcomingShifts.html?shift=${shift._id}`,
+                resourceType: "Shift",
+                resourceId: shift._id,
+            })
+        )
+    );
 
     return shift;
 };
+
 
 // get all available shifts
 const getAllShifts = async () => {
@@ -179,15 +187,6 @@ const updateShift = async (userId, shiftId, shiftData) => {
 
     // don't allow professionals needed to be reduced
     // below the number of workers already assigned
-
-   if (
-  shiftData.professionalsNeeded !== undefined &&
-  shift.assignedWorkers.length >= shift.professionalsNeeded
-) {
-  throw new Error(
-    "Professionals needed cannot be changed because all required workers have already been assigned."
-  );
-}
 
 if (
   shiftData.professionalsNeeded !== undefined &&

@@ -7,6 +7,8 @@ const createNotification = async ({
   type,
   title,
   message,
+  actionText,
+  actionLink,
   resourceType,
   resourceId,
 }) => {
@@ -31,6 +33,8 @@ const createNotification = async ({
     message,
     resourceType,
     resourceId,
+    actionText,
+    actionLink,
   });
 
   // Save first; live delivery failure should not undo the notification.

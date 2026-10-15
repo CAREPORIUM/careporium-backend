@@ -109,7 +109,7 @@ const shiftSchema = new mongoose.Schema(
         },
         reminderType: {
           type: String,
-          enum: ["24_hours", "2_hours"],
+          enum: ["24_hours", "2_hours", "clock_out"],
           required: true,
         },
         sentAt: {

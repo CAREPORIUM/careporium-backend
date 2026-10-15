@@ -8,7 +8,7 @@ import Facility from "../models/facilityModel.js"
 // generate a secure QR token for a shift
  const getShiftQrCode = async(userId, shiftId) =>{
 
-    //find the shift 
+    //find the shift
     const shift = await Shift.findById(shiftId)
 
     if (!shift){
@@ -164,16 +164,20 @@ if (facility && shift.assignedWorkers.length > 0) {
         (item) => item._id.toString() === shift._id.toString()
     );
 
+
     if (shiftReady) {
         await createNotification({
             recipient: facility.user,
             type: "SHIFT_COMPLETION_CONFIRMATION_REQUIRED",
             title: "Shift completion confirmation required",
             message: `You have ${pendingCount} shift${pendingCount === 1 ? "" : "s"} awaiting completion review. Confirm attendance and complete the shift${pendingCount === 1 ? "" : "s"} so payment can proceed.`,
+            actionText: "Review shift completion",
+            actionLink: `/FacilityHiringSection/ShiftDetails.html?shift=${shift._id}`,
             resourceType: "Shift",
             resourceId: shift._id,
         });
     }
+
 }
 
 return attendance;}

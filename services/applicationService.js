@@ -60,10 +60,32 @@ const applyForShift = async (userId, shiftId) => {
       message: "Your application for the " + shift.profession + " shift has been submitted and is awaiting review.",
       resourceType: "Application",
       resourceId: application._id,
+      actionText: "View my applications",
+      actionLink: "/WorkerShiftMarket/MyApplications.html",
     });
   } catch (error) {
     console.error("Application notification failed:", error);
   }
+
+  try {
+    const facility = await Facility.findById(shift.facility);
+
+    if (facility?.user) {
+      await createNotification({
+        recipient: facility.user,
+        type: "APPLICATION_RECEIVED",
+        title: "New shift application",
+        message: `A worker has applied for your ${shift.profession} shift.`,
+        actionText: "View applicants",
+        actionLink: `/FacilityHiringSection/Applicants.html?shift=${shift._id}`,
+        resourceType: "Shift",
+        resourceId: shift._id,
+      });
+    }
+  } catch (error) {
+    console.error("Facility application notification failed:", error);
+  }
+
 
   return application;
 };
@@ -112,7 +134,7 @@ const getApplicationsForFacility = async (userId) => {
   //get all applications for the shifts belonging to this facility
   const applications = await Application.find({
     shift: { $in: shiftIds },
-  })  
+  })
     .populate({
       path: "shift",
       populate: {
@@ -192,6 +214,8 @@ const updateApplicationStatus = async (userId, applicationId, status) => {
         message: "Your application for the " + application.shift.profession + " shift was not accepted.",
         resourceType: "Application",
         resourceId: application._id,
+        actionText: "View my applications",
+        actionLink: "/WorkerShiftMarket/MyApplications.html",
       });
     } catch (error) {
       console.error("Application rejection notification failed:", error);
@@ -216,7 +240,7 @@ const updateApplicationStatus = async (userId, applicationId, status) => {
 
   // add the worker to the shift's assignedWorkers array
   application.shift.assignedWorkers.push(application.worker._id)
-  
+
   //update the application status
   application.status = "accepted"
 
@@ -242,6 +266,8 @@ const updateApplicationStatus = async (userId, applicationId, status) => {
       message: "Your application for the " + application.shift.profession + " shift has been accepted. Check your confirmed shifts for details.",
       resourceType: "Shift",
       resourceId: application.shift._id,
+      actionText: "View confirmed shift",
+      actionLink: `/WorkerShiftMarket/UpcomingShifts.html?shift=${application.shift._id}`,
     });
   } catch (error) {
     console.error("Application acceptance notification failed:", error);

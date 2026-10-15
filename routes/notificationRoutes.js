@@ -9,10 +9,10 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-
+router.get("/my-notifications", fetchNotifications);
 router.get("/", fetchNotifications);
 router.patch("/read-all", readAllNotifications);
-router.patch("/:notificationId/read", readNotification);
+router.patch("/read/:notificationId", readNotification);
 
 
 export default router;
