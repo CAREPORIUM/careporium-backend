@@ -510,26 +510,78 @@ paths:
 
   /api/shifts/v1/create-shift:
     post:
+      summary: Create a new shift
       tags: [Shifts]
-      summary: Create a shift
-      description: The facility must be authenticated. If shift posting requires payment, the shift should not become open until payment is verified.
+      security:
+        - bearerAuth: []
+      description: Creates a shift and initiates payment. The shift remains pending payment until the payment is verified successfully.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ShiftInput'
+              type: object
+              required:
+                - profession
+                - shiftDate
+                - shiftType
+                - startTime
+                - endTime
+                - professionalsNeeded
+                - minimumExperience
+                - location
+                - payRate
+              properties:
+                profession:
+                  type: string
+                  example: Nurse
+                specialty:
+                  type: string
+                  example: General Nursing
+                shiftDate:
+                  type: string
+                  example: "2026-10-20"
+                shiftType:
+                  type: string
+                  example: Day
+                startTime:
+                  type: string
+                  example: "08:00"
+                endTime:
+                  type: string
+                  example: "20:00"
+                professionalsNeeded:
+                  type: integer
+                  minimum: 1
+                  example: 2
+                minimumExperience:
+                  type: string
+                  example: "2 years"
+                location:
+                  type: string
+                  example: "Akindele, Ikeja, Lagos, Nigeria"
+                responsibilities:
+                  type: string
+                  example: "Provide patient care and monitor vital signs"
+                reqCredentials:
+                  type: string
+                  example: "Valid professional license"
+                arrivalInstructions:
+                  type: string
+                  example: "Report to the facility reception"
+                payRate:
+                  type: number
+                  minimum: 0
+                  example: 50000
+                isUrgent:
+                  type: boolean
+                  example: false
       responses:
         '201':
-          $ref: '#/components/responses/Success'
+          description: Shift created and payment initiated
         '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
+          description: Invalid shift data or payment initiation failed
+
 
   /api/shifts/v1/get-shifts:
     get:
