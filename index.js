@@ -18,6 +18,10 @@ import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./config/swagger.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import { startShiftReminderScheduler } from "./services/shiftReminderService.js";
+import { createServer } from "node:http";
+import { initSocket } from "./config/socket.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 const PORT = process.env.PORT || 8089;
 
@@ -89,6 +93,7 @@ app.use("/api/shifts/v1", shiftRoutes);
 app.use("/api/applications/v1", applicationRoutes);
 app.use("/api/admin/v1", adminRoutes);
 app.use("/api/attendance/v1", attendanceRoutes);
+app.use("/api/notifications/v1", notificationRoutes);
 
 // handles requests to unknown routes 
 app.use((req, res) => {
@@ -151,18 +156,23 @@ app.use((err, req, res, next) => {
 });
 
 
-// connect to MongoDB before accepting requests
 const startServer = async () => {
-    try {
-        await connectDB();
+  try {
+    await connectDB();
 
-        app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
-    } catch (error) {
-        console.error("Failed to start server:", error.message);
-        process.exit(1);
-    }
+    const httpServer = createServer(app);
+
+    initSocket(httpServer);
+
+    startShiftReminderScheduler();
+
+    httpServer.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error.message);
+    process.exit(1);
+  }
 };
 
 startServer();

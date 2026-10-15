@@ -6,6 +6,7 @@ import User from "../models/userModel.js";
 import Worker from "../models/workerModel.js";
 import Facility from "../models/facilityModel.js";
 import { transporter } from "./emailService.js";
+import { createNotification } from "./notificationService.js";
 
 
 // register a new worker
@@ -242,7 +243,7 @@ const registerFacility = async (req) => {
 };
 
 
-// verify user account using OTP sent to user's email
+/// verify user account using OTP sent to user's email
 const verifyAccount = async (email, otp) => {
     if (!email || !otp) {
         throw new Error('Email and OTP are required');
@@ -284,6 +285,27 @@ const verifyAccount = async (email, otp) => {
     user.verificationOtpExpires = undefined;
 
     await user.save();
+
+     // create a welcome notification after successful account verification
+    if (user.role === "worker" || user.role === "facility") {
+        try {
+            const isWorker = user.role === "worker";
+
+            await createNotification({
+                recipient: user._id,
+                type: "WELCOME",
+                title: isWorker
+                    ? "Welcome to CAREPORIUM"
+                    : "Welcome to CAREPORIUM",
+                message: isWorker
+                    ? "Your account has been verified successfully. Welcome to CAREPORIUM!"
+                    : "Your facility account has been verified successfully. Welcome to CAREPORIUM!",
+            });
+        } catch (error) {
+            // notification failure should not undo successful account verification
+            console.error("Failed to create welcome notification:", error);
+        }
+    }
 
     return {
         userId: user._id,

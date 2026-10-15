@@ -1,7 +1,7 @@
-
 import Worker from '../models/workerModel.js';
 import Facility from '../models/facilityModel.js';
-import Shift from '../models/shiftModel.js'
+import Shift from '../models/shiftModel.js';
+import { createNotification } from "./notificationService.js";
 
 
 // handles request to retrieve all workers
@@ -116,10 +116,62 @@ const updateWorkerDocumentStatus = async (
     document.verifiedAt =
         status === 'verified' ? new Date() : undefined;
 
+    // checks whether the worker was already verified
+    const wasVerified = worker.verificationStatus === 'verified';
+
     // updates the worker's verification status automatically
     updateWorkerVerificationStatus(worker);
 
+    // save the updated worker document status
     await worker.save();
+
+    // sends a notification when a worker document is approved or rejected
+    try {
+        await createNotification({
+            recipient: worker.user,
+            type: 'WORKER_DOCUMENT_STATUS_UPDATED',
+            title: status === 'verified'
+                ? 'Document approved'
+                : 'Document rejected',
+            message: status === 'verified'
+                ? `Your ${documentType} document has been approved.`
+                : `Your ${documentType} document was rejected. Reason: ${comment.trim()}`,
+            actionText: 'View verification status',
+            actionLink: '/StatusSection/VerificationStatus.html',
+            resourceType: 'Worker',
+            resourceId: worker._id
+        });
+    } catch (error) {
+        // notification failure should not undo successful document verification
+        console.error(
+            'Failed to create worker document status notification:',
+            error
+        );
+    }
+
+    // notify the worker when their overall profile becomes verified
+    if (
+        !wasVerified &&
+        worker.verificationStatus === 'verified'
+    ) {
+        try {
+            await createNotification({
+                recipient: worker.user,
+                type: 'WORKER_VERIFIED',
+                title: 'Profile Verified',
+                message:
+                    'Congratulations! Your professional profile and required documents have been verified.',
+                resourceType: 'Worker',
+                resourceId: worker._id
+            });
+        } catch (error) {
+            // notification failure should not undo successful worker verification
+            console.error(
+                'Failed to create worker verification notification:',
+                error
+            );
+        }
+    }
 
     const updatedWorker = await worker.populate(
         'user',
@@ -251,10 +303,62 @@ const updateFacilityDocumentStatus = async (
     document.verifiedAt =
         status === 'verified' ? new Date() : undefined;
 
+    // checks whether the facility was already verified
+    const wasVerified = facility.verificationStatus === 'verified';
+
     // updates the facility's verification status automatically
     updateFacilityVerificationStatus(facility);
 
+    // save the updated facility document status
     await facility.save();
+
+    // sends a notification when a facility document is approved or rejected
+    try {
+        await createNotification({
+            recipient: facility.user,
+            type: 'FACILITY_DOCUMENT_STATUS_UPDATED',
+            title: status === 'verified'
+                ? 'Document approved'
+                : 'Document rejected',
+            message: status === 'verified'
+                ? `Your ${documentType} document has been approved.`
+                : `Your ${documentType} document was rejected. Reason: ${comment.trim()}`,
+            actionText: 'View verification status',
+            actionLink: '/StatusSection/VerificationStatus.html',
+            resourceType: 'Facility',
+            resourceId: facility._id
+        });
+    } catch (error) {
+        // notification failure should not undo successful document verification
+        console.error(
+            'Failed to create facility document status notification:',
+            error
+        );
+    }
+
+    // notify the facility when its overall profile becomes verified
+    if (
+        !wasVerified &&
+        facility.verificationStatus === 'verified'
+    ) {
+        try {
+            await createNotification({
+                recipient: facility.user,
+                type: 'FACILITY_VERIFIED',
+                title: 'Facility Verified',
+                message:
+                    'Congratulations! Your facility and required documents have been verified.',
+                resourceType: 'Facility',
+                resourceId: facility._id
+            });
+        } catch (error) {
+            // notification failure should not undo successful facility verification
+            console.error(
+                'Failed to create facility verification notification:',
+                error
+            );
+        }
+    }
 
     const updatedFacility = await facility.populate(
         'user',
@@ -263,6 +367,7 @@ const updateFacilityDocumentStatus = async (
 
     return updatedFacility;
 };
+
 
 // handles request to retrieve all pending workers
 const getPendingWorkers = async () => {
@@ -382,6 +487,7 @@ const getVerificationQueue = async () => {
 
     return verificationQueue;
 };
+
 
 // handles request to retrieve dashboard statistics
 const getDashboardStats = async () => {

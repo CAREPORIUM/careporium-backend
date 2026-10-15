@@ -30,12 +30,15 @@ const getAllShifts = async (req, res) => {
     try {
         const { date, location, specialty, search } = req.query;
 
-        const shifts = await shiftService.getAllShifts({
-            date,
-            location,
-            specialty,
-            search
-        });
+        const shifts = await shiftService.getAllShifts(
+            req.user.id,
+            {
+                date,
+                location,
+                specialty,
+                search
+            }
+        );
 
         return res.status(200).json({
             success: true,

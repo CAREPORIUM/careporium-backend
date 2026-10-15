@@ -3,9 +3,9 @@ import mongoose from "mongoose";
 const facilitySchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-    facilityName: { type: String, required: true, unique: true },
-    facilityType: { type: String, required: true },
-    location: { address: { type: String, required: true }, city: { type: String, required: true }, state: { type: String,
+    facilityName: { type: String, unique: true },
+    facilityType: { type: String },
+    location: { address: { type: String }, city: { type: String }, state: { type: String,
       enum: [
         "Abia",
         "Adamawa",
@@ -45,7 +45,7 @@ const facilitySchema = new mongoose.Schema(
         "Zamfara",
         "Federal Capital Territory",
       ]},
-      country: { type: String, required: true }
+      country: { type: String }
     },
     businessRegCert: {
         url: { type: String },

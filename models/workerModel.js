@@ -1,5 +1,60 @@
 import mongoose from "mongoose";
 
+// work experience schema
+const workExperienceSchema = new mongoose.Schema(
+  {
+    jobTitle: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    workplace: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    location: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    startMonth: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 12,
+    },
+    startYear: {
+      type: Number,
+      required: true,
+      min: 1900,
+      max: new Date().getFullYear(),
+    },
+    endMonth: {
+      type: Number,
+      min: 1,
+      max: 12,
+      default: null,
+    },
+    endYear: {
+      type: Number,
+      min: 1900,
+      max: new Date().getFullYear(),
+      default: null,
+    },
+    currentlyWorkHere: {
+      type: Boolean,
+      default: false,
+    },
+    responsibilities: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+  },
+  { timestamps: true },
+);
+
 const workerSchema = new mongoose.Schema(
   {
     user: {
@@ -8,13 +63,28 @@ const workerSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    fullName: { type: String, required: true, trim: true },
-    profession: { type: String },
-    specialty: { type: String },
-    yearsOfExperience: { type: Number, min: 0 },
+    fullName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    profession: {
+      type: String,
+    },
+    specialty: {
+      type: String,
+    },
+    yearsOfExperience: {
+      type: Number,
+      min: 0,
+    },
     location: {
-      address: { type: String },
-      street: { type: String },
+      address: {
+        type: String,
+      },
+      street: {
+        type: String,
+      },
       state: {
         type: String,
         enum: [
@@ -57,77 +127,145 @@ const workerSchema = new mongoose.Schema(
           "Federal Capital Territory",
         ],
       },
-      country: { type: String },
+      country: {
+        type: String,
+      },
     },
+
+    // proof of location document
     proofOfLocation: {
-        url: { type: String, default: "" },
-        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
-        verificationComment: { type: String, default: "" },
-        verifiedAt: { type: Date },
+      url: {
+        type: String,
+        default: "",
+      },
+      verificationStatus: {
+        type: String,
+        enum: ["pending", "verified", "rejected"],
+        default: "pending",
+      },
+      verificationComment: {
+        type: String,
+        default: "",
+      },
+      verifiedAt: {
+        type: Date,
+      },
     },
+
+    // worker certification documents
     certifications: {
       professionalLicense: {
-        url: { type: String, default: "" },
-        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
-        verificationComment: { type: String, default: "" },
-        verifiedAt: { type: Date },
+        url: {
+          type: String,
+          default: "",
+        },
+        verificationStatus: {
+          type: String,
+          enum: ["pending", "verified", "rejected"],
+          default: "pending",
+        },
+        verificationComment: {
+          type: String,
+          default: "",
+        },
+        verifiedAt: {
+          type: Date,
+        },
       },
       idDocument: {
-        url: { type: String, default: "" },
-        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
-        verificationComment: { type: String, default: "" }, 
-        verifiedAt: { type: Date },
+        url: {
+          type: String,
+          default: "",
+        },
+        verificationStatus: {
+          type: String,
+          enum: ["pending", "verified", "rejected"],
+          default: "pending",
+        },
+        verificationComment: {
+          type: String,
+          default: "",
+        },
+        verifiedAt: {
+          type: Date,
+        },
       },
       educationCert: {
-        url: { type: String, default: "" },
-        verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
-        verificationComment: { type: String, default: "" },
-        verifiedAt: { type: Date },
+        url: {
+          type: String,
+          default: "",
+        },
+        verificationStatus: {
+          type: String,
+          enum: ["pending", "verified", "rejected"],
+          default: "pending",
+        },
+        verificationComment: {
+          type: String,
+          default: "",
+        },
+        verifiedAt: {
+          type: Date,
+        },
       },
     },
 
-            // Worker bank details for receiving shift payments
-        payoutBankName: {
-            type: String,
-            trim: true,
-            default: null
-        },
+    // Work experience
+    workExperience: {
+      type: [workExperienceSchema],
+      default: [],
+    },
 
-        payoutBankCode: {
-            type: String,
-            trim: true,
-            default: null
-        },
+    // Worker bank details for receiving shift payments
+    payoutBankName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    payoutBankCode: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    payoutAccountNumber: {
+      type: String,
+      trim: true,
+      select: false,
+      default: null,
+    },
+    payoutAccountName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
 
-        payoutAccountNumber: {
-            type: String,
-            trim: true,
-            select: false,
-            default: null
-        },
+    // Paystack recipient code used for worker transfers
+    paystackRecipientCode: {
+      type: String,
+      select: false,
+      default: null,
+    },
 
-        payoutAccountName: {
-            type: String,
-            trim: true,
-            default: null
-        },
+    // Indicates whether the saved bank details have been verified
+    payoutDetailsVerified: {
+      type: Boolean,
+      default: false,
+    },
 
-        // Paystack recipient code used for worker transfers
-        paystackRecipientCode: {
-            type: String,
-            select: false,
-            default: null
-        },
+    // overall worker verification status
+    verificationStatus: {
+      type: String,
+      enum: ["pending", "verified"],
+      default: "pending",
+    },
+    verifiedAt: {
+      type: Date,
+    },
 
-        // Indicates whether the saved bank details have been verified
-        payoutDetailsVerified: {
-            type: Boolean,
-            default: false
-        },
-    verificationStatus: { type: String, enum: ["pending", "verified"], default: "pending" },
-    verifiedAt: { type: Date },
-    about: { type: String },
-
+    // worker's profile description
+    about: {
+      type: String,
+    },
   },
   { timestamps: true },
 );

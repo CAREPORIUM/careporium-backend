@@ -4,6 +4,24 @@ import Facility from "../models/facilityModel.js";
 import Attendance from "../models/attendanceModel.js";
 import Payment from "../models/paymentModel.js";
 import paymentService from "./paymentService.js";
+import Worker from '../models/workerModel.js';
+
+// checks whether the worker's profile has been verified
+const checkWorkerVerification = async (userId) => {
+    const worker = await Worker.findOne({
+        user: userId
+    }).select('verificationStatus');
+
+    if (!worker) {
+        throw new Error('Worker profile not found');
+    }
+
+    if (worker.verificationStatus !== 'verified') {
+        throw new Error(
+            'Your worker profile must be verified before you can view shifts'
+        );
+    }
+};
 
 // create a new shift under a facility's profile
 const createShift = async (userId, shiftData, clientPlatform = "web") => {
@@ -32,6 +50,13 @@ const createShift = async (userId, shiftData, clientPlatform = "web") => {
 
     if (!facility) {
         throw new Error("Facility not found for this user");
+    }
+
+    // checks whether the facility has been verified
+    if (facility.verificationStatus !== 'verified') {
+    throw new Error(
+        'Your facility must be verified by an admin before you can post shifts'
+    );
     }
 
     // create the shift as unpublished until payment is verified
@@ -94,8 +119,12 @@ const createShift = async (userId, shiftData, clientPlatform = "web") => {
 };
 
 // handles retrieval of all available shifts for healthworkers
-const getAllShifts = async ({ date, location, specialty, search } = {}) => {
+const getAllShifts = async (
+    userId,
+    { date, location, specialty, search } = {}
+) => {
 
+     await checkWorkerVerification(userId);
     // gets the current date and time in Nigeria
     const nigeriaTime = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Africa/Lagos",
@@ -248,14 +277,16 @@ const getShiftById = async (userId, role, shiftId) => {
     // worker can view the shift without seeing assigned workers
     if (role === "worker") {
 
-        // remove sensitive fields from the response
-        const shiftData = shift.toObject();
+    await checkWorkerVerification(userId);
 
-        delete shiftData.assignedWorkers;
-        delete shiftData.attendanceQrToken;
+    // remove sensitive fields from the response
+    const shiftData = shift.toObject();
 
-        return shiftData;
-    }
+    delete shiftData.assignedWorkers;
+    delete shiftData.attendanceQrToken;
+
+    return shiftData;
+}
 
     throw new Error("You are not authorized to view this shift");
 };

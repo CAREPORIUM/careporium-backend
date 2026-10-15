@@ -56,6 +56,10 @@ const clockIn = async(userId, qrToken) => {
     const shift = await Shift.findOne({
     attendanceQrToken: qrToken
     });
+
+    if (!shift) {
+    throw new Error("Invalid attendance QR code");
+    }
     //check that the worker was assigned to this shift
     const workerAssigned = shift.assignedWorkers.some(
         (workerId) => workerId.toString() === worker._id.toString()

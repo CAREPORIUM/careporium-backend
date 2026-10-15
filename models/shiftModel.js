@@ -99,6 +99,53 @@ const shiftSchema = new mongoose.Schema(
             default: "pending_payment"
         },
 
+                remindersSent: [
+            {
+                worker: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "Worker",
+                    required: true
+                },
+                reminderType: {
+                    type: String,
+                    enum: ["24_hours", "2_hours", "clock_out"],
+                    required: true
+                },
+                sentAt: {
+                    type: Date,
+                    default: Date.now
+                }
+            }
+        ],
+
+        facilityRemindersSent: [
+            {
+                reminderType: {
+                    type: String,
+                    enum: ["24_hours", "2_hours"],
+                    required: true
+                },
+                sentAt: {
+                    type: Date,
+                    default: Date.now
+                }
+            }
+        ],
+
+        urgentRemindersSent: [
+            {
+                reminderType: {
+                    type: String,
+                    enum: ["urgent_unfilled"],
+                    required: true
+                },
+                sentAt: {
+                    type: Date,
+                    default: Date.now
+                }
+            }
+        ],
+
         attendanceQrToken: {
             type: String,
             unique: true,

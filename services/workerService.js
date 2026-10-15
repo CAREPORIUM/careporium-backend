@@ -1,6 +1,190 @@
 import Worker from '../models/workerModel.js';
 import cloudinary from '../config/cloudinary.js';
 
+// validates the worker's work experience entries
+const validateWorkExperience = (workExperience) => {
+    // accept an array or a JSON string from multipart/form-data
+    if (typeof workExperience === "string") {
+        try {
+            workExperience = JSON.parse(workExperience);
+        } catch {
+            throw new Error(
+                "Work experience must be a valid JSON array"
+            );
+        }
+    }
+
+    if (!Array.isArray(workExperience)) {
+        throw new Error("Work experience must be an array");
+    }
+
+    return workExperience.map((experience, index) => {
+        if (
+            !experience ||
+            typeof experience !== "object" ||
+            Array.isArray(experience)
+        ) {
+            throw new Error(
+                `Work experience entry ${index + 1} is invalid`
+            );
+        }
+
+        const {
+            jobTitle,
+            workplace,
+            location,
+            startMonth,
+            startYear,
+            endMonth,
+            endYear,
+            currentlyWorkHere,
+            responsibilities
+        } = experience;
+
+        // ensure required text fields are provided
+        if (
+            typeof jobTitle !== "string" ||
+            !jobTitle.trim() ||
+            typeof workplace !== "string" ||
+            !workplace.trim() ||
+            typeof location !== "string" ||
+            !location.trim() ||
+            typeof responsibilities !== "string" ||
+            !responsibilities.trim()
+        ) {
+            throw new Error(
+                `Job title, workplace, location, and responsibilities are required for work experience entry ${index + 1}`
+            );
+        }
+
+        // validate the start month and year
+        const parsedStartMonth = Number(startMonth);
+        const parsedStartYear = Number(startYear);
+
+        if (
+            startMonth === undefined ||
+            startMonth === null ||
+            startMonth === "" ||
+            !Number.isInteger(parsedStartMonth) ||
+            parsedStartMonth < 1 ||
+            parsedStartMonth > 12
+        ) {
+            throw new Error(
+                `A valid start month is required for work experience entry ${index + 1}`
+            );
+        }
+
+        if (
+            startYear === undefined ||
+            startYear === null ||
+            startYear === "" ||
+            !Number.isInteger(parsedStartYear) ||
+            parsedStartYear < 1900 ||
+            parsedStartYear > new Date().getFullYear()
+        ) {
+            throw new Error(
+                `A valid start year is required for work experience entry ${index + 1}`
+            );
+        }
+
+        // validate whether the worker currently works here
+        if (
+            typeof currentlyWorkHere !== "boolean" &&
+            currentlyWorkHere !== "true" &&
+            currentlyWorkHere !== "false"
+        ) {
+            throw new Error(
+                `currentlyWorkHere must be true or false for work experience entry ${index + 1}`
+            );
+        }
+
+        const isCurrentJob =
+            currentlyWorkHere === true ||
+            currentlyWorkHere === "true";
+
+        let parsedEndMonth = null;
+        let parsedEndYear = null;
+
+        if (isCurrentJob) {
+            // current jobs must not have an end date
+            if (
+                (endMonth !== undefined &&
+                    endMonth !== null &&
+                    endMonth !== "") ||
+                (endYear !== undefined &&
+                    endYear !== null &&
+                    endYear !== "")
+            ) {
+                throw new Error(
+                    `End month and end year must be empty for current work experience entry ${index + 1}`
+                );
+            }
+        } else {
+            // previous jobs must have an end month and year
+            if (
+                endMonth === undefined ||
+                endMonth === null ||
+                endMonth === "" ||
+                endYear === undefined ||
+                endYear === null ||
+                endYear === ""
+            ) {
+                throw new Error(
+                    `End month and end year are required for previous work experience entry ${index + 1}`
+                );
+            }
+
+            parsedEndMonth = Number(endMonth);
+            parsedEndYear = Number(endYear);
+
+            if (
+                !Number.isInteger(parsedEndMonth) ||
+                parsedEndMonth < 1 ||
+                parsedEndMonth > 12
+            ) {
+                throw new Error(
+                    `A valid end month is required for work experience entry ${index + 1}`
+                );
+            }
+
+            if (
+                !Number.isInteger(parsedEndYear) ||
+                parsedEndYear < 1900 ||
+                parsedEndYear > new Date().getFullYear()
+            ) {
+                throw new Error(
+                    `A valid end year is required for work experience entry ${index + 1}`
+                );
+            }
+
+            // ensure the end date does not precede the start date
+            if (
+                parsedEndYear < parsedStartYear ||
+                (
+                    parsedEndYear === parsedStartYear &&
+                    parsedEndMonth < parsedStartMonth
+                )
+            ) {
+                throw new Error(
+                    `The end date cannot be before the start date for work experience entry ${index + 1}`
+                );
+            }
+        }
+
+        return {
+            jobTitle: jobTitle.trim(),
+            workplace: workplace.trim(),
+            location: location.trim(),
+            startMonth: parsedStartMonth,
+            startYear: parsedStartYear,
+            endMonth: isCurrentJob ? null : parsedEndMonth,
+            endYear: isCurrentJob ? null : parsedEndYear,
+            currentlyWorkHere: isCurrentJob,
+            responsibilities: responsibilities.trim()
+        };
+    });
+};
+
 // handles retrieval of worker's profile
 const getWorkerProfile = async (userId) => {
     const worker = await Worker.findOne({
@@ -10,15 +194,16 @@ const getWorkerProfile = async (userId) => {
         "-password -verificationOtp -verificationOtpExpires"
     );
 
-  if (!worker) {
-    throw new Error("Profile not found");
-  }
+    if (!worker) {
+        throw new Error("Profile not found");
+    }
 
-  return worker;
+    return worker;
 };
 
 // handles updating of worker's profile
 const updateWorkerProfile = async (userId, updateData, files) => {
+
     // only allow these worker profile fields to be updated
     const allowedFields = [
         'fullName',
@@ -65,8 +250,22 @@ const updateWorkerProfile = async (userId, updateData, files) => {
         throw new Error('Profile not found');
     }
 
+    // validate work experience only when the field is provided
+    let validatedWorkExperience;
+
+    if (updateData.workExperience !== undefined) {
+        validatedWorkExperience = validateWorkExperience(
+            updateData.workExperience
+        );
+    }
+
     // update the worker's profile information
     Object.assign(worker, filteredData);
+
+    // update work experience only when the field is provided
+    if (validatedWorkExperience !== undefined) {
+        worker.workExperience = validatedWorkExperience;
+    }
 
     // make sure the certifications object exists
     if (!worker.certifications) {
@@ -221,10 +420,11 @@ const updateWorkerProfile = async (userId, updateData, files) => {
     // save the updated worker profile
     await worker.save();
 
-    // get the updated worker profile and populate the user information
     const updatedWorker = await Worker.findById(
-        worker._id
-    ).populate(
+    worker._id
+)
+    .select('+payoutAccountNumber -payoutBankCode')
+    .populate(
         'user',
         '-password -verificationOtp -verificationOtpExpires'
     );
