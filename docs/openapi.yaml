@@ -41,7 +41,7 @@ paths:
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
               required:
@@ -67,26 +67,14 @@ paths:
                 yearsOfExperience:
                   type: integer
                   minimum: 0
-                address:
+                location.address:
                   type: string
-                street:
+                location.city:
                   type: string
-                state:
+                location.state:
                   type: string
-                country:
+                location.country:
                   type: string
-                professionalLicense:
-                  type: string
-                  format: binary
-                idDocument:
-                  type: string
-                  format: binary
-                educationCert:
-                  type: string
-                  format: binary
-                proofOfLocation:
-                  type: string
-                  format: binary
       responses:
         '201':
           description: Worker account created
@@ -107,7 +95,7 @@ paths:
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
               required:
@@ -116,9 +104,6 @@ paths:
                 - email
                 - phoneNumber
                 - password
-                - businessRegCert
-                - facilityLicense
-                - taxID
               properties:
                 facilityName:
                   type: string
@@ -132,32 +117,6 @@ paths:
                 password:
                   type: string
                   format: password
-                location.address:
-                  type: string
-                location.city:
-                  type: string
-                location.state:
-                  type: string
-                location.country:
-                  type: string
-                secondaryContact.fullName:
-                  type: string
-                secondaryContact.position:
-                  type: string
-                secondaryContact.email:
-                  type: string
-                  format: email
-                secondaryContact.phoneNumber:
-                  type: string
-                businessRegCert:
-                  type: string
-                  format: binary
-                facilityLicense:
-                  type: string
-                  format: binary
-                taxID:
-                  type: string
-                  format: binary
       responses:
         '201':
           description: Facility account created
@@ -391,28 +350,23 @@ paths:
   # WORKER PROFILES
   # =========================
 
-  /api/worker/v1/get-worker-profile/{userId}:
+  /api/worker/v1/get-worker-profile:
     get:
       tags: [Worker Profiles]
       summary: Get a worker profile
-      parameters:
-        - $ref: '#/components/parameters/UserId'
       responses:
         '200':
           $ref: '#/components/responses/Success'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
 
-  /api/worker/v1/update-worker-profile/{userId}:
+  /api/worker/v1/update-worker-profile:
     put:
       tags: [Worker Profiles]
-      summary: Update a worker profile and upload documents
-      parameters:
-        - $ref: '#/components/parameters/UserId'
+      summary: Update a worker profile
+      description: Updates worker profile details, uploads new verification documents, or replaces existing documents. All fields are optional, so documents can be uploaded without sending text fields.
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -429,13 +383,15 @@ paths:
                 yearsOfExperience:
                   type: integer
                   minimum: 0
-                address:
+                about:
                   type: string
-                street:
+                locationAddress:
                   type: string
-                state:
+                locationStreet:
                   type: string
-                country:
+                locationState:
+                  type: string
+                locationCountry:
                   type: string
                 professionalLicense:
                   type: string
@@ -451,17 +407,13 @@ paths:
                   format: binary
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Worker profile updated successfully
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
-  # =========================
-  # FACILITY PROFILES
-  # =========================
+          description: Authentication required
+        '404':
+          description: Worker profile not found
 
   /api/facility/v1/get-facility-profile:
     get:
@@ -472,17 +424,18 @@ paths:
           $ref: '#/components/responses/Success'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
 
   /api/facility/v1/update-facility-profile:
     put:
       tags: [Facility Profiles]
       summary: Update the authenticated facility profile
+      description: Updates facility profile details, uploads new verification documents, or replaces existing documents. All fields are optional, so documents can be uploaded without sending text fields.
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               properties:
@@ -490,19 +443,41 @@ paths:
                   type: string
                 facilityType:
                   type: string
-                location:
-                  $ref: '#/components/schemas/Location'
-                secondaryContact:
-                  $ref: '#/components/schemas/SecondaryContact'
+                locationAddress:
+                  type: string
+                locationCity:
+                  type: string
+                locationState:
+                  type: string
+                locationCountry:
+                  type: string
+                secondaryContactFullName:
+                  type: string
+                secondaryContactPosition:
+                  type: string
+                secondaryContactEmail:
+                  type: string
+                  format: email
+                secondaryContactPhoneNumber:
+                  type: string
+                businessRegCert:
+                  type: string
+                  format: binary
+                facilityLicense:
+                  type: string
+                  format: binary
+                taxID:
+                  type: string
+                  format: binary
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Facility profile updated successfully
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
+          description: Authentication required
+        '404':
+          description: Facility profile not found
 
   # =========================
   # SHIFTS
@@ -661,10 +636,69 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ShiftInput'
+              type: object
+              required:
+                - profession
+                - shiftDate
+                - shiftType
+                - startTime
+                - endTime
+                - professionalsNeeded
+                - minimumExperience
+                - location
+                - payRate
+              properties:
+                profession:
+                  type: string
+                  example: Nurse
+                specialty:
+                  type: string
+                  example: General Nursing
+                shiftDate:
+                  type: string
+                  example: "2026-10-20"
+                shiftType:
+                  type: string
+                  example: Day
+                startTime:
+                  type: string
+                  example: "08:00"
+                endTime:
+                  type: string
+                  example: "20:00"
+                professionalsNeeded:
+                  type: integer
+                  minimum: 1
+                  example: 2
+                minimumExperience:
+                  type: string
+                  example: "2 years"
+                location:
+                  type: string
+                  example: "Akindele, Ikeja, Lagos, Nigeria"
+                responsibilities:
+                  type: string
+                  example: "Provide patient care and monitor vital signs"
+                reqCredentials:
+                  type: string
+                  example: "Valid professional license"
+                arrivalInstructions:
+                  type: string
+                  example: "Report to the facility reception"
+                payRate:
+                  type: number
+                  minimum: 0
+                  example: 50000
+                isUrgent:
+                  type: boolean
+                  example: false
       responses:
         '200':
-          $ref: '#/components/responses/Success'
+          description: Shift updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -673,9 +707,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
+          
   /api/shifts/v1/close-shift/{shiftId}:
     patch:
       tags: [Shifts]
