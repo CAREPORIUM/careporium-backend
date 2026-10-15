@@ -138,7 +138,7 @@ const paymentSchema = new mongoose.Schema(
         provider: {
             type: String,
             enum: ['mock', 'harrenapay', 'paystack'],
-            default: 'mock'
+            default: 'paystack'
         },
         providerReference: {
             type: String,
