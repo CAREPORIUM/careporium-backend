@@ -84,14 +84,6 @@ paths:
                 email: { type: string, format: email }
                 phoneNumber: { type: string }
                 password: { type: string, format: password, minLength: 8 }
-                location.address: { type: string }
-                location.city: { type: string }
-                location.state: { type: string }
-                location.country: { type: string, example: Nigeria }
-                secondaryContact.fullName: { type: string }
-                secondaryContact.position: { type: string }
-                secondaryContact.email: { type: string, format: email }
-                secondaryContact.phoneNumber: { type: string }
       responses:
         '201':
           description: Facility account created; verification email sent

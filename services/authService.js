@@ -121,19 +121,19 @@ const registerFacility = async (req) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-const location = {
+/* *const location = {
     address: req.body['location.address'],
     city: req.body['location.city'],
     state: req.body['location.state'],
     country: req.body['location.country']
 };
 
-const secondaryContact = {
+    const secondaryContact = {
     fullName: req.body['secondaryContact.fullName'],
     position: req.body['secondaryContact.position'],
     email: req.body['secondaryContact.email'],
     phoneNumber: req.body['secondaryContact.phoneNumber']
-};
+}; */
 
     const existingUser = await User.findOne({
         email: normalizedEmail
@@ -187,8 +187,8 @@ const secondaryContact = {
             [{
                 user: user._id,
                 facilityName,
-                facilityType,
-                location: {
+                facilityType
+            /** location: {
                     address: location.address,
                     city: location.city,
                     state: location.state,
@@ -199,7 +199,7 @@ const secondaryContact = {
                     position: secondaryContact.position,
                     email: secondaryContact.email,
                     phoneNumber: secondaryContact.phoneNumber
-                }
+                } */
             }],
             { session }
         );
@@ -413,15 +413,32 @@ const logoutUser = async (userId) => {
 
 // get user profile by user ID, excluding sensitive fields like password and OTP
 const getProfile = async (userId) => {
+    
     const user = await User.findById(userId).select(
-        '-password -verificationOtp -verificationOtpExpires -resetPasswordOtp -resetPasswordOtpExpires -resetPasswordTokenHash -resetPasswordTokenExpires'
-    );
+        '-password -verificationOtp -verificationOtpExpires -resetPasswordOtp -resetPasswordOtpExpires -resetPasswordTokenHash -resetPasswordTokenExpires -isVerified'
+    ) 
 
     if (!user) {
         throw new Error('User not found');
     }
 
-    return user;
+    let profileName = null;
+    let verificationStatus = null;
+
+    if (user.role === 'worker') {
+        const worker = await Worker.findOne({ user: userId });
+        profileName = worker?.fullName || null;
+        verificationStatus = worker?.verificationStatus || null;
+    } else if (user.role === 'facility') {
+        const facility = await Facility.findOne({ user: userId });
+        profileName = facility?.facilityName || null;
+        verificationStatus = facility?.verificationStatus || null;
+    }
+
+    return {
+        ...user.toObject(),
+        profileName, verificationStatus
+    };
 };
 
 
