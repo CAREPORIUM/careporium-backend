@@ -28,14 +28,23 @@ const createShift = async (req, res) => {
 // get all available shifts
 const getAllShifts = async (req, res) => {
     try {
-        const shifts = await shiftService.getAllShifts();
+        const { date, location, specialty, search } = req.query;
+
+        const shifts = await shiftService.getAllShifts({
+            date,
+            location,
+            specialty,
+            search
+        });
 
         return res.status(200).json({
+            success: true,
             message: "Shifts fetched successfully",
             data: shifts
         });
     } catch (error) {
-        return res.status(500).json({
+        return res.status(400).json({
+            success: false,
             message: error.message
         });
     }

@@ -31,7 +31,7 @@ const getOneWorker = async (req, res) => {
     } catch (error) {
         res.status(404).json({
             success: false,
-            message: error.message
+            message: "Not found" 
         });
     }
 };
@@ -113,7 +113,7 @@ const getOneFacility = async (req, res) => {
     } catch (error) {
         res.status(404).json({
             success: false,
-            message: error.message
+            message: "Not found" 
         });
     }
 };

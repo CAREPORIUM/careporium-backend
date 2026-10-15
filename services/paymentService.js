@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import Payment from '../models/paymentModel.js';
 import Shift from '../models/shiftModel.js';
 import User from '../models/userModel.js';
@@ -66,7 +67,10 @@ const getPaymentReturnUrl = (clientPlatform = 'web') => {
         );
     }
 
-    if (parsedUrl.protocol !== 'https:' || !parsedUrl.hostname) {
+    if (
+        parsedUrl.protocol !== 'https:' ||
+        !parsedUrl.hostname
+    ) {
         throw new Error(
             'A valid HTTPS payment return URL must be configured'
         );
@@ -75,47 +79,21 @@ const getPaymentReturnUrl = (clientPlatform = 'web') => {
     return returnUrl;
 };
 
-// retrieve the configured HarrenaPay base URL
-const getHarrenaPayBaseUrl = () => {
+// send a request to Paystack and parse its response
+const requestPaystack = async (path, options = {}) => {
 
-    const baseUrl = (
-        process.env.HARRENAPAY_BASE_URL ||
-        'https://www.harrenapay.com/api/public/v1'
-    ).replace(/\/+$/, '');
+    const secretKey = process.env.PAYSTACK_SECRET_KEY;
 
-    let parsedUrl;
-
-    try {
-        parsedUrl = new URL(baseUrl);
-    } catch {
-        throw new Error('Invalid HarrenaPay base URL');
-    }
-
-    if (
-        parsedUrl.protocol !== 'https:' ||
-        !parsedUrl.hostname
-    ) {
-        throw new Error('HarrenaPay base URL must use HTTPS');
-    }
-
-    return baseUrl;
-};
-
-// send a request to HarrenaPay and parse its response
-const requestHarrenaPay = async (path, options = {}) => {
-
-    const apiKey = process.env.HARRENAPAY_API_KEY;
-
-    if (!apiKey) {
-        throw new Error('HarrenaPay API key is not configured');
+    if (!secretKey) {
+        throw new Error('Paystack secret key is not configured');
     }
 
     const response = await fetch(
-        `${getHarrenaPayBaseUrl()}${path}`,
+        `https://api.paystack.co${path}`,
         {
             ...options,
             headers: {
-                Authorization: `Bearer ${apiKey}`,
+                Authorization: `Bearer ${secretKey}`,
                 ...(options.body
                     ? { 'Content-Type': 'application/json' }
                     : {}),
@@ -126,11 +104,9 @@ const requestHarrenaPay = async (path, options = {}) => {
 
     const data = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
+    if (!response.ok || data.status !== true) {
         const error = new Error(
-            data.message ||
-            data.error ||
-            'HarrenaPay request failed'
+            data.message || 'Paystack request failed'
         );
 
         error.statusCode = response.status;
@@ -138,14 +114,29 @@ const requestHarrenaPay = async (path, options = {}) => {
         throw error;
     }
 
-    return data;
+    return data.data;
 };
 
-// initiate escrow funding with HarrenaPay
-const initiateHarrenaPayEscrow = async (
+// generate a unique reference for a payment attempt
+const generatePaymentReference = (shiftId) => {
+
+    return `careporium-${shiftId}-${crypto.randomBytes(12).toString('hex')}`;
+};
+
+// retrieve a payment attempt by its reference
+const getPaymentAttempt = (payment, reference) => {
+
+    return payment.paymentAttempts.find(
+        (attempt) => attempt.reference === reference
+    );
+};
+
+// initiate payment checkout with Paystack
+const initiatePaystackPayment = async (
     payment,
     facility,
-    returnUrl
+    returnUrl,
+    attempt
 ) => {
 
     const facilityUser = await User.findById(facility.user)
@@ -155,39 +146,46 @@ const initiateHarrenaPayEscrow = async (
         throw new Error('Facility user email could not be found');
     }
 
-    const data = await requestHarrenaPay(
-        '/escrow/initiate',
+    // persist the reference before contacting Paystack
+    payment.providerReference = attempt.reference;
+    payment.fundingStatus = 'pending';
+
+    await payment.save();
+
+    const data = await requestPaystack(
+        '/transaction/initialize',
         {
             method: 'POST',
             body: JSON.stringify({
-                reference: payment.providerReference,
-                amount: payment.amountKobo,
+                reference: attempt.reference,
+                amount: String(payment.amountKobo),
+                email: facilityUser.email,
                 currency: payment.currency,
-                customer_email: facilityUser.email,
-                customer_name: facility.facilityName,
-                description: `CAREPORIUM shift funding - ${payment.shift}`,
-                return_url: returnUrl,
-                release_window_hours: 168
+                callback_url: returnUrl,
+                metadata: {
+                    paymentId: payment._id.toString(),
+                    shiftId: payment.shift.toString(),
+                    facilityId: payment.facility.toString(),
+                    platform: 'CAREPORIUM',
+                    paymentAttemptId: attempt._id.toString()
+                }
             })
         }
     );
 
-    if (!data.checkout_url) {
+    if (
+        !data.authorization_url ||
+        data.reference !== attempt.reference
+    ) {
         throw new Error(
-            'HarrenaPay did not return a checkout URL'
+            'Paystack did not return the expected checkout URL and reference'
         );
     }
 
-    payment.providerEscrowId = data.escrow_id;
-    payment.checkoutUrl = data.checkout_url;
-    payment.virtualAccountNumber =
-        data.account_number || data.virtual_account_number;
-    payment.bankName = data.bank_name;
-    payment.expiresAt = data.expires_at
-        ? new Date(data.expires_at)
-        : undefined;
-    payment.providerEscrowStatus = 'awaiting_payment';
-    payment.fundingStatus = 'pending';
+    attempt.checkoutUrl = data.authorization_url;
+    attempt.status = 'pending';
+
+    payment.checkoutUrl = data.authorization_url;
 
     await payment.save();
 
@@ -206,7 +204,7 @@ const createPendingPayment = async ({
     const paymentProvider =
         process.env.PAYMENT_PROVIDER || 'mock';
 
-    if (!['mock', 'harrenapay'].includes(paymentProvider)) {
+    if (!['mock', 'paystack'].includes(paymentProvider)) {
         throw new Error('Unsupported payment provider');
     }
 
@@ -217,7 +215,7 @@ const createPendingPayment = async ({
         throw new Error('Mock payments are disabled in production');
     }
 
-    const returnUrl = paymentProvider === 'harrenapay'
+    const returnUrl = paymentProvider === 'paystack'
         ? getPaymentReturnUrl(clientPlatform)
         : undefined;
 
@@ -236,7 +234,6 @@ const createPendingPayment = async ({
         workerPayoutAmountKobo:
             amounts.workerPayoutAmountKobo,
         provider: paymentProvider,
-        providerReference: `careporium_shift_${shift._id}`,
         clientPlatform,
         fundingStatus: 'pending',
         completionStatus: 'pending',
@@ -244,18 +241,27 @@ const createPendingPayment = async ({
         disputeStatus: 'none'
     });
 
-    if (paymentProvider === 'harrenapay') {
-        try {
-            return await initiateHarrenaPayEscrow(
-                payment,
-                facility,
-                returnUrl
-            );
-        } catch (error) {
-            payment.fundingStatus = 'failed';
-            await payment.save();
-            throw error;
-        }
+    if (paymentProvider === 'paystack') {
+
+        // create the first payment attempt
+        payment.paymentAttempts.push({
+            reference: generatePaymentReference(shift._id),
+            status: 'pending'
+        });
+
+        const attempt =
+            payment.paymentAttempts[payment.paymentAttempts.length - 1];
+
+        payment.providerReference = attempt.reference;
+
+        await payment.save();
+
+        return initiatePaystackPayment(
+            payment,
+            facility,
+            returnUrl,
+            attempt
+        );
     }
 
     return payment;
@@ -281,9 +287,9 @@ const retryShiftPayment = async ({ shift, facility }) => {
         return payment;
     }
 
-    if (payment.provider !== 'harrenapay') {
+    if (payment.provider !== 'paystack') {
         throw new Error(
-            'Payment retry is only available for HarrenaPay payments'
+            'Payment retry is only available for Paystack payments'
         );
     }
 
@@ -291,24 +297,338 @@ const retryShiftPayment = async ({ shift, facility }) => {
         throw new Error('A refunded payment cannot be retried');
     }
 
-    const returnUrl = getPaymentReturnUrl(
-        payment.clientPlatform || 'web'
-    );
+    if (payment.disputeStatus === 'open') {
+        throw new Error('A disputed payment cannot be retried');
+    }
 
-    payment.fundingStatus = 'pending';
-    await payment.save();
+    // support payment records created before attempt tracking
+    if (!payment.paymentAttempts) {
+        payment.paymentAttempts = [];
+    }
 
-    try {
-        return await initiateHarrenaPayEscrow(
+    if (
+        payment.paymentAttempts.length === 0 &&
+        payment.providerReference
+    ) {
+        payment.paymentAttempts.push({
+            reference: payment.providerReference,
+            checkoutUrl: payment.checkoutUrl || null,
+            status: payment.fundingStatus === 'failed'
+                ? 'failed'
+                : 'pending'
+        });
+    }
+
+    const latestAttempt =
+        payment.paymentAttempts[payment.paymentAttempts.length - 1];
+
+    // reuse the existing checkout while its transaction is pending
+    if (
+        latestAttempt &&
+        latestAttempt.status === 'pending' &&
+        latestAttempt.checkoutUrl
+    ) {
+        return payment;
+    }
+
+    const returnUrl = getPaymentReturnUrl(payment.clientPlatform);
+
+    // retry initialization with the same reference when checkout is missing
+    if (
+        latestAttempt &&
+        latestAttempt.status === 'pending' &&
+        !latestAttempt.checkoutUrl
+    ) {
+        return initiatePaystackPayment(
             payment,
             facility,
-            returnUrl
+            returnUrl,
+            latestAttempt
         );
-    } catch (error) {
-        payment.fundingStatus = 'failed';
-        await payment.save();
-        throw error;
     }
+
+    // create a new reference after a failed attempt
+    const newAttempt = {
+        reference: generatePaymentReference(shift._id),
+        status: 'pending'
+    };
+
+    payment.paymentAttempts.push(newAttempt);
+
+    const attempt =
+        payment.paymentAttempts[payment.paymentAttempts.length - 1];
+
+    payment.providerReference = attempt.reference;
+    payment.checkoutUrl = null;
+    payment.fundingStatus = 'pending';
+
+    await payment.save();
+
+    return initiatePaystackPayment(
+        payment,
+        facility,
+        returnUrl,
+        attempt
+    );
+};
+
+// verify a Paystack transaction and fund the shift when confirmed
+const verifyPaystackPayment = async (reference) => {
+
+    if (
+        typeof reference !== 'string' ||
+        !reference.trim()
+    ) {
+        throw new Error('A valid Paystack transaction reference is required');
+    }
+
+    const payment = await Payment.findOne({
+        provider: 'paystack',
+        $or: [
+            { providerReference: reference },
+            { 'paymentAttempts.reference': reference }
+        ]
+    });
+
+    if (!payment) {
+        throw new Error('Paystack payment not found');
+    }
+
+    const attempt = getPaymentAttempt(payment, reference);
+
+    if (
+        payment.fundingStatus === 'refunded'
+    ) {
+        throw new Error('This payment has already been refunded');
+    }
+
+    // confirm transaction status directly with Paystack
+    const transaction = await requestPaystack(
+        `/transaction/verify/${encodeURIComponent(reference)}`,
+        { method: 'GET' }
+    );
+
+    if (
+        transaction.reference !== reference ||
+        Number(transaction.amount) !== payment.amountKobo ||
+        transaction.currency !== payment.currency
+    ) {
+        throw new Error(
+            'Paystack transaction reference, amount, or currency does not match'
+        );
+    }
+
+    if (transaction.status !== 'success') {
+
+        if (
+            ['failed', 'abandoned', 'reversed'].includes(
+                transaction.status
+            )
+        ) {
+            // mark only the matching pending attempt as failed
+            await Payment.updateOne(
+                {
+                    _id: payment._id,
+                    'paymentAttempts.reference': reference,
+                    'paymentAttempts.status': 'pending'
+                },
+                {
+                    $set: {
+                        'paymentAttempts.$.status': 'failed',
+                        'paymentAttempts.$.failureReason':
+                            `Paystack transaction status: ${transaction.status}`
+                    }
+                }
+            );
+
+            const currentPayment = await Payment.findById(payment._id);
+
+            const hasPendingAttempt =
+                currentPayment.paymentAttempts.some(
+                    (item) => item.status === 'pending'
+                );
+
+            if (
+                currentPayment.fundingStatus !== 'funded' &&
+                !hasPendingAttempt
+            ) {
+                await Payment.updateOne(
+                    {
+                        _id: payment._id,
+                        fundingStatus: 'pending'
+                    },
+                    {
+                        $set: { fundingStatus: 'failed' }
+                    }
+                );
+            }
+        }
+
+        return {
+            payment: await Payment.findById(payment._id),
+            verified: false,
+            transactionStatus: transaction.status
+        };
+    }
+
+    // do not process an attempt that cannot be reconciled
+    if (
+        !attempt &&
+        payment.providerReference !== reference
+    ) {
+        throw new Error('Payment attempt could not be reconciled');
+    }
+
+    // already-funded attempts are safe to verify again
+    if (
+        payment.fundingStatus === 'funded' &&
+        attempt?.status === 'funded'
+    ) {
+        return {
+            payment,
+            verified: true,
+            alreadyFunded: true,
+            duplicatePayment: false
+        };
+    }
+
+    // a late success after another attempt funded the shift needs reconciliation
+    if (payment.fundingStatus === 'funded') {
+
+        await Payment.updateOne(
+            {
+                _id: payment._id,
+                'paymentAttempts.reference': reference
+            },
+            {
+                $set: {
+                    'paymentAttempts.$.status': 'duplicate_success',
+                    'paymentAttempts.$.providerTransactionId':
+                        transaction.id != null
+                            ? String(transaction.id)
+                            : null,
+                    'paymentAttempts.$.fundedAt': new Date(),
+                    'paymentAttempts.$.failureReason':
+                        'Additional successful charge requires reconciliation'
+                }
+            }
+        );
+
+        return {
+            payment: await Payment.findById(payment._id),
+            verified: true,
+            alreadyFunded: true,
+            duplicatePayment: true,
+            message:
+                'This transaction succeeded after the shift was already funded. Reconciliation is required.'
+        };
+    }
+
+    // claim the successful payment without overwriting a refunded payment
+    const updatedPayment = await Payment.findOneAndUpdate(
+        {
+            _id: payment._id,
+            fundingStatus: { $in: ['pending', 'failed'] }
+        },
+        {
+            $set: {
+                fundingStatus: 'funded',
+                providerReference: reference,
+                providerTransactionId: transaction.id != null
+                    ? String(transaction.id)
+                    : null,
+                fundedAt: new Date()
+            }
+        },
+        { new: true }
+    );
+
+    if (!updatedPayment) {
+
+        const currentPayment = await Payment.findById(payment._id);
+
+        if (currentPayment.fundingStatus === 'refunded') {
+            throw new Error('This payment has already been refunded');
+        }
+
+        if (currentPayment.fundingStatus === 'funded') {
+            return {
+                payment: currentPayment,
+                verified: true,
+                alreadyFunded: true,
+                duplicatePayment: true,
+                message:
+                    'Another successful transaction has already funded this shift. Reconciliation is required.'
+            };
+        }
+
+        throw new Error('Unable to reconcile payment status');
+    }
+
+    // record the successful attempt
+    await Payment.updateOne(
+        {
+            _id: updatedPayment._id,
+            'paymentAttempts.reference': reference
+        },
+        {
+            $set: {
+                'paymentAttempts.$.status': 'funded',
+                'paymentAttempts.$.providerTransactionId':
+                    transaction.id != null
+                        ? String(transaction.id)
+                        : null,
+                'paymentAttempts.$.fundedAt': new Date(),
+                'paymentAttempts.$.failureReason': null
+            }
+        }
+    );
+
+    // publish only if the shift is still awaiting payment
+    await Shift.updateOne(
+        {
+            _id: updatedPayment.shift,
+            status: 'pending_payment'
+        },
+        {
+            $set: { status: 'open' }
+        }
+    );
+
+    return {
+        payment: await Payment.findById(updatedPayment._id),
+        verified: true,
+        alreadyFunded: false,
+        duplicatePayment: false
+    };
+};
+
+// handle verified Paystack webhook events
+const handlePaystackWebhook = async (event) => {
+
+    if (!event?.event) {
+        throw new Error('Invalid Paystack webhook payload');
+    }
+
+    // Successful transaction events are verified again against Paystack.
+    if (event.event === 'charge.success') {
+        const reference = event.data?.reference;
+
+        if (!reference) {
+            throw new Error(
+                'Paystack webhook is missing its transaction reference'
+            );
+        }
+
+        return verifyPaystackPayment(reference);
+    }
+
+    // Other event types are not processed by this payment handler.
+    return {
+        received: true,
+        processed: false,
+        message: 'Event ignored'
+    };
 };
 
 // simulate payment only while developing locally
@@ -347,210 +667,6 @@ const simulateMockPayment = async (paymentId) => {
     );
 
     return payment;
-};
-
-// simulate HarrenaPay sandbox funding using its documented endpoint
-const simulateHarrenaPaySandboxFunding = async (paymentId) => {
-
-    if (process.env.NODE_ENV === 'production') {
-        throw new Error(
-            'Sandbox funding simulation is disabled in production'
-        );
-    }
-
-    if (!process.env.HARRENAPAY_API_KEY?.startsWith('hpay_test_')) {
-        throw new Error(
-            'A HarrenaPay sandbox API key beginning with hpay_test_ is required'
-        );
-    }
-
-    const payment = await Payment.findOne({
-        _id: paymentId,
-        provider: 'harrenapay'
-    });
-
-    if (!payment) {
-        throw new Error('HarrenaPay payment not found');
-    }
-
-    if (payment.fundingStatus === 'funded') {
-        return payment;
-    }
-
-    await requestHarrenaPay(
-        `/escrow/${encodeURIComponent(payment.providerReference)}/simulate-fund`,
-        { method: 'POST' }
-    );
-
-    // Funding is confirmed by the verified webhook or status reconciliation.
-    return payment;
-};
-
-// retrieve payment status from HarrenaPay
-const getPaymentStatus = async (providerReference) => {
-
-    const payment = await Payment.findOne({ providerReference });
-
-    if (!payment) {
-        throw new Error('Payment not found');
-    }
-
-    if (payment.provider !== 'harrenapay') {
-        throw new Error('This payment does not use HarrenaPay');
-    }
-
-    return requestHarrenaPay(
-        `/escrow/${encodeURIComponent(providerReference)}`,
-        { method: 'GET' }
-    );
-};
-
-// handles verified webhook events from HarrenaPay
-const handleHarrenaPayWebhook = async (event) => {
-
-    const { event: eventType, reference, amount, currency } = event || {};
-
-    if (!eventType || !reference) {
-        throw new Error('Invalid HarrenaPay webhook payload');
-    }
-
-    const supportedEvents = [
-        'escrow.funded',
-        'payment.success',
-        'payment.failed',
-        'escrow.accepted',
-        'escrow.declined',
-        'escrow.delivered',
-        'escrow.released',
-        'escrow.refunded',
-        'dispute.opened'
-    ];
-
-    if (!supportedEvents.includes(eventType)) {
-        return {
-            received: true,
-            processed: false,
-            message: 'Event ignored'
-        };
-    }
-
-    const payment = await Payment.findOne({
-        providerReference: reference,
-        provider: 'harrenapay'
-    });
-
-    if (!payment) {
-        throw new Error('Payment not found for this provider reference');
-    }
-
-    if (
-        eventType === 'escrow.funded' ||
-        eventType === 'payment.success'
-    ) {
-        if (
-            amount === undefined ||
-            !Number.isFinite(Number(amount)) ||
-            Number(amount) !== payment.amountKobo ||
-            currency !== payment.currency
-        ) {
-            throw new Error(
-                'Funding webhook amount or currency does not match the payment'
-            );
-        }
-
-        if (payment.fundingStatus === 'funded') {
-            return {
-                received: true,
-                processed: false,
-                message: 'Payment was already funded'
-            };
-        }
-
-        if (
-            payment.fundingStatus === 'refunded' ||
-            payment.fundingStatus === 'failed'
-        ) {
-            throw new Error(
-                'Payment cannot transition to funded from its current status'
-            );
-        }
-
-        payment.fundingStatus = 'funded';
-        payment.providerEscrowStatus = 'funded';
-        payment.fundedAt = new Date();
-
-        await payment.save();
-
-        await Shift.findOneAndUpdate(
-            {
-                _id: payment.shift,
-                status: 'pending_payment'
-            },
-            { $set: { status: 'open' } }
-        );
-
-        return { received: true, processed: true };
-    }
-
-    if (eventType === 'payment.failed') {
-        if (
-            payment.fundingStatus === 'funded' ||
-            payment.fundingStatus === 'refunded'
-        ) {
-            return {
-                received: true,
-                processed: false,
-                message: 'Payment is already funded or refunded'
-            };
-        }
-
-        payment.fundingStatus = 'failed';
-        payment.providerEscrowStatus = 'failed';
-    }
-
-    if (eventType === 'escrow.accepted') {
-        payment.providerEscrowStatus = 'accepted';
-    }
-
-    if (eventType === 'escrow.delivered') {
-        payment.providerEscrowStatus = 'delivered';
-    }
-
-    if (eventType === 'escrow.released') {
-        // Escrow release does not prove a CAREPORIUM worker was paid.
-        payment.providerEscrowStatus = 'released';
-    }
-
-    if (eventType === 'escrow.refunded') {
-        payment.fundingStatus = 'refunded';
-        payment.providerEscrowStatus = 'refunded';
-        payment.payoutStatus = 'on_hold';
-        payment.workerPayouts.forEach((payout) => {
-            if (payout.status !== 'paid') {
-                payout.status = 'on_hold';
-            }
-        });
-    }
-
-    if (eventType === 'dispute.opened') {
-        payment.disputeStatus = 'open';
-        payment.payoutStatus = 'on_hold';
-        payment.providerEscrowStatus = 'disputed';
-        payment.workerPayouts.forEach((payout) => {
-            if (payout.status !== 'paid') {
-                payout.status = 'on_hold';
-            }
-        });
-    }
-
-    if (eventType === 'escrow.declined') {
-        payment.providerEscrowStatus = 'declined';
-        payment.payoutStatus = 'on_hold';
-    }
-
-    await payment.save();
-
-    return { received: true, processed: true };
 };
 
 // prepare a worker payout after shift completion
@@ -669,6 +785,25 @@ const simulateWorkerPayout = async ({ shiftId, workerId, facility }) => {
     return { payment, workerPayout, alreadyPaid: false };
 };
 
+// compatibility guard for the removed HarrenaPay integration
+const simulateHarrenaPaySandboxFunding = async () => {
+    throw new Error(
+        'HarrenaPay is no longer configured. Use Paystack test transactions.'
+    );
+};
+
+// retrieve the status of a Paystack payment
+const getPaymentStatus = async (providerReference) => {
+    return verifyPaystackPayment(providerReference);
+};
+
+// compatibility guard for the removed HarrenaPay webhook
+const handleHarrenaPayWebhook = async () => {
+    throw new Error(
+        'HarrenaPay webhooks are no longer supported. Configure the Paystack webhook.'
+    );
+};
+
 export default {
     createPendingPayment,
     retryShiftPayment,
@@ -676,6 +811,8 @@ export default {
     simulateHarrenaPaySandboxFunding,
     getPaymentStatus,
     handleHarrenaPayWebhook,
+    handlePaystackWebhook,
+    verifyPaystackPayment,
     prepareWorkerPayout,
     simulateWorkerPayout
 };

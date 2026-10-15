@@ -78,7 +78,7 @@ const createShift = async (userId, shiftData, clientPlatform = "web") => {
             };
         }
 
-        // keep the shift unpublished until HarrenaPay confirms funding
+        // keep the shift unpublished until Paystack confirms funding
         return {
             shift,
             payment
@@ -93,17 +93,102 @@ const createShift = async (userId, shiftData, clientPlatform = "web") => {
     }
 };
 
-// get all available shifts
-const getAllShifts = async () => {
+// handles retrieval of all available shifts for healthworkers
+const getAllShifts = async ({ date, location, specialty, search } = {}) => {
 
-    const shifts = await Shift.find({
-        status: "open"
-    }).populate({
-        path: "facility",
-        select: "facilityName facilityType location"
-    });
+    // gets the current date and time in Nigeria
+    const nigeriaTime = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Africa/Lagos",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+    }).formatToParts(new Date());
 
-    return shifts;
+    const getPart = (type) =>
+        nigeriaTime.find((part) => part.type === type).value;
+
+    const today = `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
+    const currentTime = `${getPart("hour")}:${getPart("minute")}`;
+
+    // only retrieves open shifts that have not started
+    const filter = {
+        status: "open",
+        $or: [
+            { shiftDate: { $gt: today } },
+            {
+                shiftDate: today,
+                startTime: { $gt: currentTime }
+            }
+        ]
+    };
+
+    // filters shifts by date
+    if (date) {
+        filter.shiftDate = date;
+    }
+
+    // filters shifts by location
+    if (location) {
+        filter.location = {
+            $regex: location,
+            $options: "i"
+        };
+    }
+
+    // filters shifts by specialty
+    if (specialty) {
+        filter.specialty = {
+            $regex: specialty,
+            $options: "i"
+        };
+    }
+
+    // searches by profession, specialty, or facility name
+    if (search) {
+        const matchingFacilities = await Facility.find({
+            facilityName: {
+                $regex: search,
+                $options: "i"
+            }
+        }).distinct("_id");
+
+        filter.$and = [
+            {
+                $or: [
+                    {
+                        profession: {
+                            $regex: search,
+                            $options: "i"
+                        }
+                    },
+                    {
+                        specialty: {
+                            $regex: search,
+                            $options: "i"
+                        }
+                    },
+                    {
+                        facility: {
+                            $in: matchingFacilities
+                        }
+                    }
+                ]
+            }
+        ];
+    }
+
+    return await Shift.find(filter)
+        .populate({
+            path: "facility",
+            select: "facilityName facilityType location"
+        })
+        .sort({
+            shiftDate: 1,
+            startTime: 1
+        });
 };
 
 // get a single shift by its ID

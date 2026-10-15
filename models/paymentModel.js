@@ -1,262 +1,225 @@
+import mongoose from 'mongoose';
 
-import mongoose from "mongoose";
+// stores individual attempts to fund a shift
+const paymentAttemptSchema = new mongoose.Schema(
+    {
+        reference: {
+            type: String,
+            required: true
+        },
+        checkoutUrl: {
+            type: String,
+            default: null
+        },
+        status: {
+            type: String,
+            enum: [
+                'pending',
+                'failed',
+                'funded',
+                'duplicate_success'
+            ],
+            default: 'pending'
+        },
+        providerTransactionId: {
+            type: String,
+            default: null
+        },
+        failureReason: {
+            type: String,
+            default: null
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now
+        },
+        fundedAt: {
+            type: Date,
+            default: null
+        }
+    },
+    { _id: true }
+);
 
+// stores each worker's payout for a completed shift
 const workerPayoutSchema = new mongoose.Schema(
     {
         worker: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Worker",
+            ref: 'Worker',
             required: true
         },
-
         amountKobo: {
             type: Number,
             required: true,
             min: 1
         },
-
         status: {
             type: String,
             enum: [
-                "not_ready",
-                "pending",
-                "processing",
-                "paid",
-                "failed",
-                "on_hold"
+                'not_ready',
+                'pending',
+                'processing',
+                'paid',
+                'failed',
+                'on_hold'
             ],
-            default: "not_ready"
+            default: 'not_ready'
         },
-
         payoutReference: {
             type: String,
             default: null
         },
-
         providerTransferCode: {
             type: String,
             default: null
         },
-
         providerRecipientCode: {
             type: String,
             default: null
         },
-
         paidAt: {
             type: Date,
             default: null
         },
-
         failureReason: {
             type: String,
             default: null
         }
     },
-    {
-        _id: false
-    }
+    { _id: true }
 );
 
+// stores payment and payout details for a shift
 const paymentSchema = new mongoose.Schema(
     {
         shift: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Shift",
+            ref: 'Shift',
             required: true,
             unique: true
         },
-
         facility: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Facility",
+            ref: 'Facility',
             required: true
         },
-
         currency: {
             type: String,
-            enum: ["NGN"],
-            default: "NGN"
+            default: 'NGN'
         },
-
-        // Total amount charged for the entire shift, in kobo
         amountKobo: {
             type: Number,
             required: true,
             min: 1
         },
-
-        // Platform commission expressed in basis points
-        // 1000 basis points = 10%
         commissionRateBps: {
             type: Number,
-            required: true,
-            min: 0,
             default: 1000
         },
-
-        // CAREPORIUM's commission, in kobo
         platformCommissionAmountKobo: {
             type: Number,
-            required: true,
+            default: 0,
             min: 0
         },
-
-        // Total amount allocated to all assigned workers, in kobo
         workerPayoutAmountKobo: {
             type: Number,
-            required: true,
-            min: 1
+            default: 0,
+            min: 0
         },
-
-        // Individual worker payout records
         workerPayouts: {
             type: [workerPayoutSchema],
             default: []
         },
-
-        // Payment provider used for this transaction
-        // HarrenaPay remains available for legacy payment records
+        paymentAttempts: {
+            type: [paymentAttemptSchema],
+            default: []
+        },
         provider: {
             type: String,
-            enum: ["mock", "harrenapay", "paystack"],
-            default: "mock"
+            enum: ['mock', 'harrenapay', 'paystack'],
+            default: 'mock'
         },
-
-        // Internal or provider payment reference
         providerReference: {
             type: String,
-            unique: true,
-            sparse: true
+            default: undefined
         },
-
-        // Paystack transaction ID returned by the provider
         providerTransactionId: {
             type: String,
             default: null
         },
-
-        // Legacy HarrenaPay escrow identifier
         providerEscrowId: {
             type: String,
             default: null
         },
-
-        // Legacy HarrenaPay escrow status
         providerEscrowStatus: {
             type: String,
-            enum: [
-                "pending",
-                "awaiting_payment",
-                "funded",
-                "accepted",
-                "delivered",
-                "released",
-                "refunded",
-                "declined",
-                "disputed",
-                "failed"
-            ],
-            default: "pending"
+            default: null
         },
-
-        // Checkout URL returned by the payment provider
         checkoutUrl: {
             type: String,
             default: null
         },
-
-        // Legacy virtual account details
         virtualAccountNumber: {
             type: String,
             default: null
         },
-
         bankName: {
             type: String,
             default: null
         },
-
-        // Expiry time for the payment checkout, if provided
         expiresAt: {
             type: Date,
             default: null
         },
-
-        // Whether the facility's payment has been received
         fundingStatus: {
             type: String,
-            enum: [
-                "pending",
-                "funded",
-                "failed",
-                "refunded"
-            ],
-            default: "pending"
+            enum: ['pending', 'funded', 'failed', 'refunded'],
+            default: 'pending'
         },
-
-        // Whether shift completion has been confirmed
         completionStatus: {
             type: String,
-            enum: [
-                "pending",
-                "submitted",
-                "confirmed",
-                "disputed"
-            ],
-            default: "pending"
+            enum: ['pending', 'submitted', 'confirmed', 'disputed'],
+            default: 'pending'
         },
-
-        // Overall status of worker payouts
         payoutStatus: {
             type: String,
             enum: [
-                "not_ready",
-                "pending",
-                "processing",
-                "paid",
-                "failed",
-                "on_hold"
+                'not_ready',
+                'pending',
+                'processing',
+                'paid',
+                'failed',
+                'on_hold'
             ],
-            default: "not_ready"
+            default: 'not_ready'
         },
-
-        // Platform where the facility initiated payment
         clientPlatform: {
             type: String,
-            enum: ["web", "mobile"],
-            default: "web"
+            enum: ['web', 'mobile'],
+            default: 'web'
         },
-
-        // Dispute tracking
         disputeStatus: {
             type: String,
-            enum: ["none", "open", "resolved"],
-            default: "none"
+            enum: ['none', 'open', 'resolved'],
+            default: 'none'
         },
-
         disputeReason: {
             type: String,
             default: null
         },
-
-        // Legacy or overall payout reference
         payoutReference: {
             type: String,
             default: null
         },
-
-        // Payment and completion timestamps
         fundedAt: {
             type: Date,
             default: null
         },
-
         completionConfirmedAt: {
             type: Date,
             default: null
         },
-
         paidAt: {
             type: Date,
             default: null
@@ -267,6 +230,18 @@ const paymentSchema = new mongoose.Schema(
     }
 );
 
-const Payment = mongoose.model("Payment", paymentSchema);
+// ensure payment references can be looked up efficiently
+paymentSchema.index(
+    { providerReference: 1 },
+    { unique: true, sparse: true }
+);
+
+// retrieve payments for a facility
+paymentSchema.index({ facility: 1, createdAt: -1 });
+
+// retrieve payments by funding and payout status
+paymentSchema.index({ fundingStatus: 1, payoutStatus: 1 });
+
+const Payment = mongoose.model('Payment', paymentSchema);
 
 export default Payment;

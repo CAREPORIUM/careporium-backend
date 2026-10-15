@@ -4,11 +4,11 @@ import { authMiddleware } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// receive HarrenaPay webhooks using the original raw request body
+// receive Paystack webhooks using the original raw request body
 router.post(
-    '/harrenapay/webhook',
+    '/paystack/webhook',
     express.raw({ type: 'application/json' }),
-    paymentController.handleHarrenaPayWebhook
+    paymentController.handlePaystackWebhook
 );
 
 // retry funding for an existing shift
@@ -16,6 +16,13 @@ router.post(
     '/retry/:shiftId',
     authMiddleware,
     paymentController.retryShiftPayment
+);
+
+// verify payment directly with Paystack
+router.post(
+    '/verify/:shiftId',
+    authMiddleware,
+    paymentController.verifyShiftPayment
 );
 
 // retrieve payment history
@@ -32,7 +39,7 @@ router.get(
     paymentController.getShiftPaymentStatus
 );
 
-// simulate HarrenaPay sandbox funding
+// deprecated HarrenaPay sandbox funding endpoint
 router.post(
     '/sandbox/fund/:shiftId',
     authMiddleware,
