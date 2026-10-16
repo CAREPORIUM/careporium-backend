@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import Payment from '../models/paymentModel.js';
 import Shift from '../models/shiftModel.js';
 import User from '../models/userModel.js';
+import Facility from '../models/facilityModel.js'
 
 // calculate the total shift funding amount
 const calculatePaymentAmounts = (payRate, professionalsNeeded) => {
@@ -740,79 +741,91 @@ const prepareWorkerPayout = async ({ shiftId, workerId, facility }) => {
     return { payment, workerPayout, alreadyPaid: false };
 };
 
-// simulate a worker payout for end-to-end development testing only
-const simulateWorkerPayout = async ({ shiftId, workerId, facility }) => {
+// handles retrieval of payment history
+const getPaymentHistory = async (userId, role) => {
 
-    if (process.env.NODE_ENV === 'production') {
-        throw new Error(
-            'Simulated worker payouts are disabled in production'
-        );
+    let payments;
+
+    // retrieves payment history for a facility
+    if (role === 'facility') {
+
+        const facility = await Facility.findOne({ user: userId });
+
+        if (!facility) {
+            throw new Error('Facility profile not found.');
+        }
+
+        payments = await Payment.find({ facility: facility._id })
+            .populate({
+                path: 'shift',
+                select: 'profession specialty shiftDate startTime endTime status'
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+
     }
 
-    const { payment, alreadyPaid } = await prepareWorkerPayout({
-        shiftId,
-        workerId,
-        facility
-    });
+    // retrieves payment history for a worker
+    else if (role === 'worker') {
 
-    if (alreadyPaid) {
-        return { payment, alreadyPaid: true };
+        const worker = await Worker.findOne({ user: userId });
+
+        if (!worker) {
+            throw new Error('Worker profile not found.');
+        }
+
+        const shifts = await Shift.find({
+            assignedWorkers: worker._id
+        }).select('_id');
+
+        const shiftIds = shifts.map(shift => shift._id);
+
+        payments = await Payment.find({
+            shift: { $in: shiftIds }
+        })
+            .populate({
+                path: 'shift',
+                select: 'profession specialty shiftDate startTime endTime status'
+            })
+            .populate({
+                path: 'facility',
+                select: 'facilityName facilityType'
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+
     }
 
-    const workerPayout = payment.workerPayouts.find(
-        (payout) => payout.worker.toString() === workerId.toString()
-    );
+    // retrieves all payment history for an admin
+    else if (role === 'admin') {
 
-    workerPayout.status = 'paid';
-    workerPayout.payoutReference =
-        `mock_payout_${payment._id}_${workerId}`;
-    workerPayout.paidAt = new Date();
+        payments = await Payment.find()
+            .populate({
+                path: 'shift',
+                select: 'profession specialty shiftDate startTime endTime status'
+            })
+            .populate({
+                path: 'facility',
+                select: 'facilityName facilityType'
+            })
+            .sort({ createdAt: -1 })
+            .lean();
 
-    const unpaidPayouts = payment.workerPayouts.filter(
-        (payout) => payout.status !== 'paid'
-    );
-
-    payment.payoutStatus = unpaidPayouts.length === 0
-        ? 'paid'
-        : 'pending';
-
-    if (payment.payoutStatus === 'paid') {
-        payment.paidAt = new Date();
+    } else {
+        throw new Error('Unauthorized to view payment history.');
     }
 
-    await payment.save();
-
-    return { payment, workerPayout, alreadyPaid: false };
+    return payments;
 };
 
-// compatibility guard for the removed HarrenaPay integration
-const simulateHarrenaPaySandboxFunding = async () => {
-    throw new Error(
-        'HarrenaPay is no longer configured. Use Paystack test transactions.'
-    );
-};
-
-// retrieve the status of a Paystack payment
-const getPaymentStatus = async (providerReference) => {
-    return verifyPaystackPayment(providerReference);
-};
-
-// compatibility guard for the removed HarrenaPay webhook
-const handleHarrenaPayWebhook = async () => {
-    throw new Error(
-        'HarrenaPay webhooks are no longer supported. Configure the Paystack webhook.'
-    );
-};
 
 export default {
     createPendingPayment,
     retryShiftPayment,
     simulateMockPayment,
-    simulateHarrenaPaySandboxFunding,
-    getPaymentStatus,
-    handleHarrenaPayWebhook,
     handlePaystackWebhook,
     verifyPaystackPayment,
     prepareWorkerPayout,
-    simulateWorkerPayout
+    getPaymentHistory
+
 };

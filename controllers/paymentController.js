@@ -375,6 +375,28 @@ const simulateWorkerPayout = async (req, res) => {
     }
 };
 
+// handles retrieval of payment history
+const getPHistory = async (req, res) => {
+    try {
+        const payments = await paymentService.getPaymentHistory(
+            req.user.id,
+            req.user.role
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: 'Payment history retrieved successfully.',
+            data: payments
+        });
+
+    } catch (error) {
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
 export default {
     handlePaystackWebhook,
     retryShiftPayment,
@@ -382,5 +404,6 @@ export default {
     getShiftPaymentStatus,
     verifyShiftPayment,
     simulateSandboxFunding,
-    simulateWorkerPayout
+    simulateWorkerPayout,
+    getPHistory
 };
