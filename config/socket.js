@@ -11,7 +11,8 @@ const initSocket = (httpServer) => {
         process.env.FRONTEND_PROD_URL,
         'http://127.0.0.1:5500',
         'http://localhost:8089',
-        'https://careporium-backend.onrender.com'
+        'https://careporium-backend.onrender.com',
+        'https://careporium.netlify.app/'
       ].filter(Boolean),
       methods: ["GET", "POST", "PATCH"],
       credentials: true,

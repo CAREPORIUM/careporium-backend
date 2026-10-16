@@ -35,6 +35,8 @@ app.use(helmet());
 const allowedOrigins = [
     process.env.FRONTEND_LOCAL_URL,
     process.env.FRONTEND_PROD_URL,
+    'https://careporium.netlify.app/',
+    'https://careporium.netlify.app/authenticationsection/login',
     'http://127.0.0.1:5500',
     'http://localhost:8089',
     'https://careporium-backend.onrender.com'
