@@ -3,6 +3,7 @@ import Worker from '../models/workerModel.js';
 import Facility from '../models/facilityModel.js';
 import Shift from '../models/shiftModel.js';
 import Application from '../models/applicationModel.js';
+import cloudinary from '../config/cloudinary.js';
 
 // validates the worker's work experience entries
 const validateWorkExperience = (workExperience) => {
