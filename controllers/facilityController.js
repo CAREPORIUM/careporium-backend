@@ -1,4 +1,4 @@
-import { getFacilityProfile, updateFacilityProfile } from '../services/facilityService.js';
+import { getFacilityProfile, updateFacilityProfile, getFacilityById } from '../services/facilityService.js';
 
 // receives the retrieve facility's profile request and passes the request data to the...
 // ...getFacilityProfile service in facilityService.js, which handles the retrieval logic 
@@ -43,4 +43,31 @@ const updateFProfile = async (req, res) => {
     }
 };
 
-export { getFProfile, updateFProfile };
+// handles request to retrieve a single facility's details
+const getFById = async (req, res) => {
+    try {
+        const facility = await getFacilityById(
+            req.params.facilityId
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Facility details retrieved successfully",
+            data: facility
+        });
+    } catch (error) {
+        const statusCode =
+            error.message === "Invalid facility ID"
+                ? 400
+                : error.message === "Facility not found"
+                    ? 404
+                    : 500;
+
+        return res.status(statusCode).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+export { getFProfile, updateFProfile, getFById };

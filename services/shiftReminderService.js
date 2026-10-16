@@ -118,7 +118,7 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
                 },
               },
             },
-            { new: true }
+            { returnDocument: 'after' }
           );
 
           if (claimedShift) {
@@ -241,7 +241,7 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
               },
             },
           },
-          { new: true }
+          { returnDocument: 'after' }
         );
 
         if (!claimedWorkerShift) {
@@ -333,7 +333,7 @@ const sendShiftReminders = async ({ now = Date.now(), shiftId } = {}) => {
             },
           },
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
 
       if (!claimedFacilityShift) {
@@ -531,7 +531,7 @@ const sendClockOutReminders = async ({ now = Date.now(), shiftId } = {}) => {
                         }
                     }
                 },
-                { new: true }
+                { returnDocument: 'after' }
             );
 
             if (!claimedShift) {

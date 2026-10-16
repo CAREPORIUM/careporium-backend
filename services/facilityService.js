@@ -1,4 +1,4 @@
-import Facility from '../models/facilityModel.js'
+//import Facility from '../models/facilityModel.js'
 import cloudinary from '../config/cloudinary.js'
 
 
@@ -146,5 +146,30 @@ const updateFacilityProfile = async (
     return updatedFacility;
 };
 
+import mongoose from 'mongoose';
+import Facility from '../models/facilityModel.js';
 
-export { getFacilityProfile, updateFacilityProfile };
+// gets a single facility's details
+const getFacilityById = async (facilityId) => {
+
+    // validate the facility ID
+    if (!mongoose.isValidObjectId(facilityId)) {
+        throw new Error("Invalid facility ID");
+    }
+
+    // find the facility by its ID
+    const facility = await Facility.findById(facilityId)
+        .select(
+            'facilityName facilityType location verificationStatus'
+        )
+        .lean();
+
+    if (!facility) {
+        throw new Error("Facility not found");
+    }
+
+    return facility;
+};
+
+
+export { getFacilityProfile, updateFacilityProfile, getFacilityById };

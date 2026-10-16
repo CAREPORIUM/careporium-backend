@@ -5,6 +5,8 @@ import Attendance from "../models/attendanceModel.js";
 import Payment from "../models/paymentModel.js";
 import paymentService from "./paymentService.js";
 import Worker from '../models/workerModel.js';
+import Application from '../models/applicationModel.js';
+import crypto from 'crypto'
 
 // checks whether the worker's profile has been verified
 const checkWorkerVerification = async (userId) => {
@@ -453,6 +455,178 @@ const closeShift = async (userId, shiftId) => {
     return shift;
 };
 
+//get all applicants and applications for a facility
+const getApplicationsForFacility = async (userId) => {
+  const facility = await Facility.findOne({
+    user: userId,
+  });
+
+  if (!facility) {
+    throw new Error("Facility not found for this user.");
+  }
+
+  //get all shiftss belonging to this facility
+  const shifts = await Shift.find({
+    facility: facility._id
+  }).select('_id');
+
+  const shiftIds = shifts.map((shift) => shift._id);
+
+  //get all applications for the shifts belonging to this facility
+  const applications = await Application.find({
+    shift: { $in: shiftIds },
+  })  
+    .populate({
+      path: "shift",
+      populate: {
+      path: "facility",
+      select: "facilityName facilityType location"
+     },
+    })
+
+    .populate({
+      path: "worker",
+      select: "fullName profession specialty yearsOfExperience",
+    })
+
+    return applications;
+}
+
+ /** // Remove applications whose shift doesn't belong to this facility
+  const facilityApplications = applications.filter(
+    (application) => application.shift !== null,
+  );
+
+  if (facilityApplications.length === 0) {
+    throw new Error("No applications found for this facility.");
+  }
+
+  return facilityApplications;
+}; */
+
+// get all applicants for a specific shift belonging to a facility
+const getApplicantsForShift = async (userId, shiftId) => {
+
+    // find the facility associated with the user
+    const facility = await Facility.findOne({
+        user: userId
+    });
+
+    if (!facility) {
+        throw new Error("Facility not found for this user.");
+    }
+
+    // find the shift and confirm it belongs to this facility
+    const shift = await Shift.findOne({
+        _id: shiftId,
+        facility: facility._id
+    });
+
+    if (!shift) {
+        throw new Error("Shift not found or does not belong to this facility.");
+    }
+
+    // get all applications for this shift
+    const applications = await Application.find({
+        shift: shift._id
+    })
+        .populate({
+            path: "worker",
+            select: "fullName profession specialty yearsOfExperience location about verificationStatus workExperience"
+        })
+        .populate({
+            path: "shift",
+            select: "profession specialty shiftDate shiftType startTime endTime status professionalsNeeded"
+        });
+
+    return {
+        shift,
+        totalApplicants: applications.length,
+        applications
+    };
+};
+
+//facility can accept or reject an application for their shift ( hence the application status)
+const updateApplicationStatus = async (userId, applicationId, status) => {
+  //find the facility for the user from the user id in the database, if no facility is found, throw an error
+  const facility = await Facility.findOne({ user: userId });
+  if (!facility) {
+    throw new Error("Facility not found for this user");
+  }
+  // check if uodated status is a valid one
+  if (!["accepted", "rejected"].includes(status)) {
+    throw new Error(
+      "Invalid status. Only 'accepted' or 'rejected' are allowed",
+    );
+  }
+  //check if the application exists
+  const application = await Application.findById(applicationId)
+  .populate({
+    path: "worker",
+    select: "fullName profession specialty yearsOfExperience location",
+  }).populate({
+      path: "shift"
+    })
+
+  if (!application) {
+    throw new Error("Application not found.");
+  }
+
+  if (!application.shift) {
+    throw new Error("The shift associated with this application was not found");
+  }
+  //check if this application belongs to the facility, if not throw an error
+  if (application.shift.facility.toString() !== facility._id.toString()) {
+    throw new Error("You are not authorized to update this application.");
+  }
+
+  // only pending applications can be accepted or rejected
+  if(application.status !== "pending") {
+    throw new Error(`This application has already been ${application.status}`);
+  }
+
+  if (status === "rejected") {
+    application.status = 'rejected'
+    await application.save()
+    return application
+  }
+  // check if the shift still has space for another professional
+  if (application.shift.assignedWorkers.length >= application.shift.professionalsNeeded) {
+    throw new Error("This shift already has all the professionals it needs.")
+  }
+
+  // check if this worker has already been assigned to the shift
+
+  const workerAlreadyAssigned = application.shift.assignedWorkers.some(
+    (workerId) => workerId.toString() === application.worker._id.toString()
+  )
+
+  if (workerAlreadyAssigned) {
+    throw new Error("This worker has already been assigned to this shift.");
+  }
+
+  // add the worker to the shift's assignedWorkers array
+  application.shift.assignedWorkers.push(application.worker._id)
+  
+  //update the application status
+  application.status = "accepted"
+
+  // check if all the required professionals have been assigned
+  if(
+    application.shift.assignedWorkers.length >=
+    application.shift.professionalsNeeded){
+      application.shift.status = "filled"
+
+      if(!application.shift.attendanceQrToken){
+        application.shift.attendanceQrToken = crypto.randomBytes(32).toString("hex")
+      }
+    }
+
+  await application.shift.save() 
+  await application.save();
+  return application;
+};
+
 // handles completion of a shift after all assigned workers have clocked out
 const completeShift = async (userId, shiftId) => {
 
@@ -662,8 +836,11 @@ const deleteShift = async (userId, shiftId) => {
 export default {
     createShift,
     getAllShifts,
+    getApplicationsForFacility,
     getShiftById,
     getShiftsForFacility,
+    getApplicantsForShift,
+    updateApplicationStatus,
     updateShift,
     deleteShift,
     closeShift,

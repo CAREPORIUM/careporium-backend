@@ -10,6 +10,9 @@ router.post("/create-shift", authMiddleware, requireRole("facility"), shiftContr
 router.get("/get-shifts", authMiddleware, requireRole("worker"), shiftController.getAllShifts)
 router.get("/get-shift/:shiftId", authMiddleware, shiftController.getShiftById)
 router.get("/get-facility-shifts", authMiddleware, requireRole("facility"), shiftController.getShiftsForFacility)
+router.get("/get-shift-applications/:shiftId", authMiddleware, requireRole("facility"),shiftController.getApplicantsForShiftController);
+router.get("/fetch-applications", authMiddleware, requireRole("facility"), shiftController.getShiftsApplicationsForFacility)
+router.patch("/:applicationId/status", authMiddleware, requireRole("facility"), shiftController.updateAppStatus);
 router.put("/update-shift/:shiftId", authMiddleware, requireRole("facility"), shiftController.updateShift)
 router.patch("/close-shift/:shiftId", authMiddleware, requireRole("facility"), shiftController.closeShift)
 router.patch("/complete-shift/:shiftId", authMiddleware, requireRole("facility"), shiftController.completeShift)

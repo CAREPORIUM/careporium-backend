@@ -1,5 +1,8 @@
+import mongoose from 'mongoose';
 import Worker from '../models/workerModel.js';
-import cloudinary from '../config/cloudinary.js';
+import Facility from '../models/facilityModel.js';
+import Shift from '../models/shiftModel.js';
+import Application from '../models/applicationModel.js';
 
 // validates the worker's work experience entries
 const validateWorkExperience = (workExperience) => {
@@ -432,7 +435,107 @@ const updateWorkerProfile = async (userId, updateData, files) => {
     return updatedWorker;
 };
 
+// gets a specific worker's profile for facility hiring or admin review
+const getWorkerProfileForHiring = async (userId, role, workerId) => {
+
+    // validate the worker ID
+    if (!mongoose.isValidObjectId(workerId)) {
+        throw new Error("Invalid worker ID");
+    }
+
+    // find the worker whose profile is being requested
+    const worker = await Worker.findById(workerId).lean();
+
+    if (!worker) {
+        throw new Error("Worker not found");
+    }
+
+    // facilities can only view workers who applied to their shifts
+    if (role === 'facility') {
+
+        // find the facility associated with the logged-in user
+        const facility = await Facility.findOne({
+            user: userId
+        }).select('_id');
+
+        if (!facility) {
+            throw new Error("Facility not found for this user");
+        }
+
+        // find shifts belonging to this facility
+        const shifts = await Shift.find({
+            facility: facility._id
+        }).distinct('_id');
+
+        // confirm that the worker applied to one of this facility's shifts
+        const application = await Application.findOne({
+            worker: worker._id,
+            shift: { $in: shifts }
+        }).select('_id');
+
+       /** if (!application) {
+            throw new Error(
+                "You are not authorized to view this worker's profile"
+            );
+        } */
+
+    } else if (role !== 'admin') {
+        throw new Error("You are not authorized to view this worker's profile");
+    }
+
+    // return only the profile information needed for hiring
+    return {
+        _id: worker._id,
+        fullName: worker.fullName,
+        profession: worker.profession,
+        specialty: worker.specialty,
+        yearsOfExperience: worker.yearsOfExperience,
+
+        location: {
+            city: worker.location?.city || '',
+            state: worker.location?.state || ''
+        },
+
+        about: worker.about || '',
+
+        documents: {
+            professionalLicense: {
+                verificationStatus:
+                    worker.certifications?.professionalLicense?.verificationStatus
+                    || 'pending'
+            },
+            idDocument: {
+                verificationStatus:
+                    worker.certifications?.idDocument?.verificationStatus
+                    || 'pending'
+            },
+            educationCert: {
+                verificationStatus:
+                    worker.certifications?.educationCert?.verificationStatus
+                    || 'pending'
+            },
+            proofOfLocation: {
+                verificationStatus:
+                    worker.proofOfLocation?.verificationStatus || 'pending'
+            }
+        },
+
+        experiences: worker.workExperience || [],
+        softSkills: worker.softSkills || [],
+
+        // Connect these values to the actual review and attendance records.
+        stats: {
+            rating: null,
+            reviews: null,
+            completedShifts: null,
+            attendanceRate: null,
+            noShows90Days: null
+        }
+    };
+};
+
 export {
     getWorkerProfile,
-    updateWorkerProfile
+    updateWorkerProfile,
+    getWorkerProfileForHiring
 };

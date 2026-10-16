@@ -111,6 +111,75 @@ const updateShift = async (req, res) => {
     }
 };
 
+// get all applicants and applications for a facility
+const getShiftsApplicationsForFacility = async (req, res) => {
+    try {
+        const applications =
+            await shiftService.getApplicationsForFacility(req.user.id);
+
+        return res.status(200).json({
+            message: "Applications retrieved successfully.",
+            data: applications
+        });
+    } catch (error) {
+        return res.status(400).json({
+            error: error.message
+        });
+    }
+};
+
+// handles request to retrieve all applicants for a specific shift
+const getApplicantsForShiftController = async (req, res) => {
+    try {
+        const result = await shiftService.getApplicantsForShift(
+            req.user.id,
+            req.params.shiftId
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Shift applicants retrieved successfully.",
+            data: result
+        });
+    } catch (error) {
+        const statusCode =
+            error.message === "Facility not found for this user."
+                ? 404
+                : error.message === "Invalid shift ID"
+                    ? 400
+                    : error.message.includes("Shift not found")
+                        ? 404
+                        : error.message.includes("not authorized")
+                            ? 403
+                            : 500;
+
+        return res.status(statusCode).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+//update application status for a facility
+const updateAppStatus = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { applicationId } = req.params;
+    const { status } = req.body;
+    const application = await shiftService.updateApplicationStatus(
+    req.user.id,
+    req.params.applicationId,
+    req.body.status
+    );
+    res.status(200).json({
+      message: "Application status updated successfully.",
+      data: application,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 // close a shift
 const closeShift = async (req, res) => {
     try {
@@ -177,6 +246,9 @@ export default {
     getAllShifts,
     getShiftById,
     getShiftsForFacility,
+    getShiftsApplicationsForFacility,
+    getApplicantsForShiftController,
+    updateAppStatus,
     updateShift,
     closeShift,
     completeShift,

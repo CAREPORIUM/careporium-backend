@@ -1,6 +1,7 @@
 import {
     getWorkerProfile,
-    updateWorkerProfile
+    updateWorkerProfile,
+    getWorkerProfileForHiring
 } from '../services/workerService.js';
 
 
@@ -44,4 +45,35 @@ const updateWProfile = async (req, res) => {
     }
 };
 
-export { getWProfile, updateWProfile };
+// handles request to retrieve a specific worker's profile for hiring
+const getWProfileForHiring = async (req, res) => {
+    try {
+        const worker = await getWorkerProfileForHiring(
+            req.user.id,
+            req.user.role,
+            req.params.workerId
+        );
+
+        res.status(200).json({
+            success: true,
+            data: worker
+        });
+    } catch (error) {
+        const statusCode =
+            error.message === "Worker not found" ||
+            error.message === "Facility not found for this user"
+                ? 404
+                : error.message === "Invalid worker ID"
+                    ? 400
+                    : error.message.includes("not authorized")
+                        ? 403
+                        : 500;
+
+        res.status(statusCode).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+export { getWProfile, updateWProfile, getWProfileForHiring };
