@@ -14,6 +14,7 @@ const notificationSchema = new mongoose.Schema(
     enum: [
     "WELCOME",
     "APPLICATION_RECEIVED",
+    "APPLICATION_SUBMITTED",
     "APPLICATION_STATUS_UPDATED",
     "FACILITY_VERIFIED",
     "WORKER_VERIFIED",

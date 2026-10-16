@@ -7,6 +7,7 @@ import paymentService from "./paymentService.js";
 import Worker from '../models/workerModel.js';
 import Application from '../models/applicationModel.js';
 import crypto from 'crypto'
+import { createNotification } from "./notificationService.js";
 
 // checks whether the worker's profile has been verified
 const checkWorkerVerification = async (userId) => {
@@ -563,7 +564,7 @@ const updateApplicationStatus = async (userId, applicationId, status) => {
   const application = await Application.findById(applicationId)
   .populate({
     path: "worker",
-    select: "fullName profession specialty yearsOfExperience location",
+    select: "user fullName profession specialty yearsOfExperience location",
   }).populate({
       path: "shift"
     })
@@ -585,10 +586,32 @@ const updateApplicationStatus = async (userId, applicationId, status) => {
     throw new Error(`This application has already been ${application.status}`);
   }
 
-  if (status === "rejected") {
-    application.status = 'rejected'
-    await application.save()
-    return application
+    if (status === "rejected") {
+    application.status = "rejected";
+    await application.save();
+
+    // notify the worker that their application was rejected
+    try {
+      if (application.worker?.user) {
+        await createNotification({
+          recipient: application.worker.user,
+          type: "APPLICATION_STATUS_UPDATED",
+          title: "Application update",
+          message: "Your application for this shift was rejected.",
+          actionText: "View my applications",
+          actionLink: "/worker/applications",
+          resourceType: "Application",
+          resourceId: application._id,
+        });
+      }
+    } catch (error) {
+      console.error(
+        "Failed to create application rejection notification:",
+        error
+      );
+    }
+
+    return application;
   }
   // check if the shift still has space for another professional
   if (application.shift.assignedWorkers.length >= application.shift.professionalsNeeded) {
@@ -622,8 +645,30 @@ const updateApplicationStatus = async (userId, applicationId, status) => {
       }
     }
 
-  await application.shift.save() 
+    await application.shift.save();
   await application.save();
+
+  // notify the worker that their application was accepted
+  try {
+    if (application.worker?.user) {
+      await createNotification({
+        recipient: application.worker.user,
+        type: "APPLICATION_STATUS_UPDATED",
+        title: "Application update",
+        message: "Your application for this shift was accepted.",
+        actionText: "View my applications",
+        actionLink: "/worker/applications",
+        resourceType: "Application",
+        resourceId: application._id,
+      });
+    }
+  } catch (error) {
+    console.error(
+      "Failed to create application acceptance notification:",
+      error
+    );
+  }
+
   return application;
 };
 

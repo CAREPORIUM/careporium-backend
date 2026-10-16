@@ -1,19 +1,21 @@
 import Application from "../models/applicationModel.js";
 import Worker from "../models/workerModel.js";
 import Shift from "../models/shiftModel.js";
+import Facility from "../models/facilityModel.js";
+import { createNotification } from "./notificationService.js";
 
 
 // workers apply for shifts, this service handles the application logic
 
 const applyForShift = async (userId, shiftId) => {
-  // check for  worker id and shift id
-  const worker = await Worker.findOne({ user: userId })
+  // check for worker id and shift id
+  const worker = await Worker.findOne({ user: userId });
 
   if (!worker) {
-    throw new Error("Worker not found")
+    throw new Error("Worker not found");
   }
 
-  const shift = await Shift.findById(shiftId)
+  const shift = await Shift.findById(shiftId);
 
   if (!shift) {
     throw new Error("Shift not found");
@@ -24,7 +26,7 @@ const applyForShift = async (userId, shiftId) => {
     throw new Error("This shift is no longer accepting applications.");
   }
 
-  //check if the shift still needs professionals
+  // check if the shift still needs professionals
   if (
     shift.assignedWorkers.length >=
     shift.professionalsNeeded
@@ -50,10 +52,53 @@ const applyForShift = async (userId, shiftId) => {
     shift: shiftId,
   });
 
+    // notify the facility when a worker applies for a shift
+  try {
+    const facility = await Facility.findById(shift.facility);
+
+    if (facility?.user) {
+      await createNotification({
+        recipient: facility.user,
+        type: "APPLICATION_RECEIVED",
+        title: "New shift application",
+        message: "A worker has applied for your shift.",
+        actionText: "View application",
+        actionLink: "/facility/applications",
+        resourceType: "Application",
+        resourceId: application._id,
+      });
+    }
+  } catch (error) {
+    console.error(
+      "Failed to create facility application notification:",
+      error
+    );
+  }
+
+  // notify the worker that the application was submitted successfully
+  try {
+    await createNotification({
+      recipient: userId,
+      type: "APPLICATION_SUBMITTED",
+      title: "Application submitted",
+      message: "Your shift application has been submitted successfully.",
+      actionText: "View my applications",
+      actionLink: "/worker/applications",
+      resourceType: "Application",
+      resourceId: application._id,
+    });
+  } catch (error) {
+    console.error(
+      "Failed to create worker application notification:",
+      error
+    );
+  }
+
   return application;
 };
 
-//get all my applications as a worker
+
+// get all my applications as a worker
 const getApplicationsForWorker = async (userId) => {
   const worker = await Worker.findOne({ user: userId });
 
@@ -62,19 +107,20 @@ const getApplicationsForWorker = async (userId) => {
   }
 
   const applications = await Application.find({ worker: worker._id })
-  .populate({
-    path: "shift",
-    populate: {
-      path: "facility",
-      select: "facilityName facilityType location",
-    },
-  });
-  //if there are no applications for the worker, throw an error
+    .populate({
+      path: "shift",
+      populate: {
+        path: "facility",
+        select: "facilityName facilityType location",
+      },
+    });
+
+  // if there are no applications for the worker, throw an error
   if (!applications) {
     throw new Error("No applications found for this worker.");
   }
 
-  return applications
-}
+  return applications;
+};
 
 export default { applyForShift, getApplicationsForWorker };

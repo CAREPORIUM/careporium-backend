@@ -22,6 +22,9 @@ import { startShiftReminderScheduler } from "./services/shiftReminderService.js"
 import { createServer } from "node:http";
 import { initSocket } from "./config/socket.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import payoutRoutes from './routes/payoutRoutes.js';
+import disputeRoutes from './routes/disputeRoutes.js';
+
 
 const PORT = process.env.PORT || 8089;
 
@@ -94,6 +97,8 @@ app.use("/api/applications/v1", applicationRoutes);
 app.use("/api/admin/v1", adminRoutes);
 app.use("/api/attendance/v1", attendanceRoutes);
 app.use("/api/notifications/v1", notificationRoutes);
+app.use('/api/payouts/v1', payoutRoutes);
+app.use('/api/disputes/v1', disputeRoutes);
 
 // handles requests to unknown routes 
 app.use((req, res) => {

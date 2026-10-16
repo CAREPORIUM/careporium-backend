@@ -3,6 +3,7 @@ import Payment from '../models/paymentModel.js';
 import Shift from '../models/shiftModel.js';
 import User from '../models/userModel.js';
 import Facility from '../models/facilityModel.js'
+import Worker from '../models/workerModel.js';
 
 // calculate the total shift funding amount
 const calculatePaymentAmounts = (payRate, professionalsNeeded) => {
@@ -741,6 +742,323 @@ const prepareWorkerPayout = async ({ shiftId, workerId, facility }) => {
     return { payment, workerPayout, alreadyPaid: false };
 };
 
+// process a worker payout through Paystack
+const processWorkerPayout = async ({ shiftId, workerId, facility }) => {
+
+    const payment = await Payment.findOne({
+        shift: shiftId,
+        facility: facility._id
+    });
+
+    if (!payment) {
+        throw new Error('Payment record not found');
+    }
+
+    if (payment.fundingStatus !== 'funded') {
+        throw new Error('Shift payment has not been funded');
+    }
+
+    if (payment.completionStatus !== 'confirmed') {
+        throw new Error('Shift completion has not been confirmed');
+    }
+
+    if (payment.disputeStatus === 'open') {
+        throw new Error('Payout is blocked by an open dispute');
+    }
+
+    const shift = await Shift.findOne({
+        _id: shiftId,
+        facility: facility._id,
+        status: 'completed'
+    });
+
+    if (!shift) {
+        throw new Error('Completed shift not found for this facility');
+    }
+
+    const assignedWorker = shift.assignedWorkers.some(
+        (worker) => worker.toString() === workerId.toString()
+    );
+
+    if (!assignedWorker) {
+        throw new Error('Worker is not assigned to this shift');
+    }
+
+    const workerPayout = payment.workerPayouts.find(
+        (payout) => payout.worker.toString() === workerId.toString()
+    );
+
+    if (!workerPayout) {
+        throw new Error('Worker payout record not found');
+    }
+
+    if (workerPayout.status === 'paid') {
+        return { payment, workerPayout, alreadyPaid: true };
+    }
+
+    if (workerPayout.status === 'on_hold') {
+        throw new Error('Worker payout is on hold');
+    }
+
+    if (['pending', 'processing'].includes(workerPayout.status)) {
+        throw new Error(
+            'Worker payout is already pending or processing'
+        );
+    }
+
+    if (payment.provider !== 'paystack') {
+        throw new Error('Paystack is required for real worker payouts');
+    }
+
+    // retrieve the worker's verified bank details
+    const worker = await Worker.findById(workerId).select(
+        '+payoutAccountNumber +paystackRecipientCode'
+    );
+
+    if (!worker) {
+        throw new Error('Worker not found');
+    }
+
+    if (
+        !worker.payoutDetailsVerified ||
+        !worker.payoutBankCode ||
+        !worker.payoutAccountNumber ||
+        !worker.payoutAccountName
+    ) {
+        throw new Error(
+            'Worker must have verified bank details before payout'
+        );
+    }
+
+    if (
+        !Number.isSafeInteger(workerPayout.amountKobo) ||
+        workerPayout.amountKobo < 1
+    ) {
+        throw new Error('Worker payout amount is invalid');
+    }
+
+    if (!process.env.PAYSTACK_SECRET_KEY) {
+        throw new Error('Paystack secret key is not configured');
+    }
+
+    // reuse a stable reference so retries can be reconciled
+    if (!workerPayout.payoutReference) {
+        workerPayout.payoutReference =
+            `careporium-payout-${payment._id}-${workerPayout._id}-${crypto.randomBytes(8).toString('hex')}`;
+    }
+
+    // claim the payout before calling Paystack
+    workerPayout.status = 'processing';
+    workerPayout.failureReason = null;
+
+    payment.payoutStatus = 'processing';
+
+    await payment.save();
+
+    try {
+
+        // create a Paystack transfer recipient when one does not exist
+        if (!worker.paystackRecipientCode) {
+
+            const recipient = await requestPaystack(
+                '/transferrecipient',
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        type: 'nuban',
+                        name: worker.payoutAccountName,
+                        account_number: worker.payoutAccountNumber,
+                        bank_code: worker.payoutBankCode,
+                        currency: 'NGN'
+                    })
+                }
+            );
+
+            if (!recipient.recipient_code) {
+                throw new Error(
+                    'Paystack did not return a recipient code'
+                );
+            }
+
+            worker.paystackRecipientCode = recipient.recipient_code;
+
+            await worker.save();
+        }
+
+        workerPayout.providerRecipientCode =
+            worker.paystackRecipientCode;
+
+        await payment.save();
+
+        // initiate the worker transfer
+        const transfer = await requestPaystack(
+            '/transfer',
+            {
+                method: 'POST',
+                body: JSON.stringify({
+                    source: 'balance',
+                    amount: String(workerPayout.amountKobo),
+                    recipient: worker.paystackRecipientCode,
+                    reference: workerPayout.payoutReference,
+                    reason: `CAREPORIUM shift payout ${shiftId}`
+                })
+            }
+        );
+
+        workerPayout.providerTransferCode =
+            transfer.transfer_code || null;
+
+        // Paystack transfer initiation is not proof of final payment
+        workerPayout.status =
+            transfer.status === 'success' ||
+            transfer.status === 'completed'
+                ? 'paid'
+                : 'processing';
+
+        if (workerPayout.status === 'paid') {
+            workerPayout.paidAt = new Date();
+        }
+
+        payment.payoutStatus = payment.workerPayouts.every(
+            (payout) => payout.status === 'paid'
+        )
+            ? 'paid'
+            : 'processing';
+
+        if (payment.payoutStatus === 'paid') {
+            payment.paidAt = new Date();
+        }
+
+        await payment.save();
+
+        return {
+            payment,
+            workerPayout,
+            message: 'Paystack payout request processed successfully.'
+        };
+
+    } catch (error) {
+
+        // keep the payout processing if the provider's outcome is uncertain
+        // so a retry cannot accidentally send a second transfer
+        workerPayout.failureReason = error.message;
+
+        await payment.save();
+
+        throw error;
+    }
+};
+
+// verify the status of an existing Paystack transfer
+const verifyWorkerPayout = async ({ shiftId, workerId, facility }) => {
+
+    const payment = await Payment.findOne({
+        shift: shiftId,
+        facility: facility._id
+    });
+
+    if (!payment) {
+        throw new Error('Payment record not found');
+    }
+
+    const workerPayout = payment.workerPayouts.find(
+        (payout) => payout.worker.toString() === workerId.toString()
+    );
+
+    if (!workerPayout) {
+        throw new Error('Worker payout record not found');
+    }
+
+    if (workerPayout.status === 'paid') {
+        return {
+            payment,
+            workerPayout,
+            verified: true,
+            alreadyPaid: true
+        };
+    }
+
+    if (!workerPayout.payoutReference) {
+        throw new Error('Payout reference not found');
+    }
+
+    if (!['processing', 'pending'].includes(workerPayout.status)) {
+        throw new Error(
+            'Only pending or processing payouts can be reconciled'
+        );
+    }
+
+    // retrieve the current transfer status from Paystack
+    const transfer = await requestPaystack(
+        `/transfer/verify/${encodeURIComponent(workerPayout.payoutReference)}`,
+        { method: 'GET' }
+    );
+
+    if (
+        transfer.reference !== workerPayout.payoutReference
+    ) {
+        throw new Error(
+            'Paystack transfer reference does not match'
+        );
+    }
+
+    workerPayout.providerTransferCode =
+        transfer.transfer_code || workerPayout.providerTransferCode;
+
+    if (transfer.status === 'success') {
+
+        workerPayout.status = 'paid';
+        workerPayout.paidAt = workerPayout.paidAt || new Date();
+        workerPayout.failureReason = null;
+
+    } else if (
+        ['failed', 'reversed'].includes(transfer.status)
+    ) {
+
+        // do not retry automatically; confirm the failed transfer first
+        workerPayout.status = 'failed';
+        workerPayout.failureReason =
+            `Paystack transfer status: ${transfer.status}`;
+
+    } else {
+
+        // pending or other non-final statuses must remain unpaid
+        workerPayout.status = 'processing';
+    }
+
+    payment.payoutStatus = payment.workerPayouts.every(
+        (payout) => payout.status === 'paid'
+    )
+        ? 'paid'
+        : payment.workerPayouts.some(
+            (payout) => payout.status === 'processing' ||
+                        payout.status === 'pending'
+        )
+            ? 'processing'
+            : payment.workerPayouts.some(
+                (payout) => payout.status === 'on_hold'
+            )
+                ? 'on_hold'
+                : payment.workerPayouts.some(
+                    (payout) => payout.status === 'failed'
+                )
+                    ? 'failed'
+                    : 'not_ready';
+
+    if (payment.payoutStatus === 'paid') {
+        payment.paidAt = payment.paidAt || new Date();
+    }
+
+    await payment.save();
+
+    return {
+        payment,
+        workerPayout,
+        verified: transfer.status === 'success',
+        transferStatus: transfer.status
+    };
+};
+
 // handles retrieval of payment history
 const getPaymentHistory = async (userId, role) => {
 
@@ -766,6 +1084,7 @@ const getPaymentHistory = async (userId, role) => {
     }
 
     // retrieves payment history for a worker
+        // retrieves payment history for a worker
     else if (role === 'worker') {
 
         const worker = await Worker.findOne({ user: userId });
@@ -793,6 +1112,15 @@ const getPaymentHistory = async (userId, role) => {
             })
             .sort({ createdAt: -1 })
             .lean();
+
+        // return only the logged-in worker's payout information
+        payments = payments.map((payment) => ({
+            ...payment,
+            workerPayouts: (payment.workerPayouts || []).filter(
+                (payout) =>
+                    payout.worker.toString() === worker._id.toString()
+            )
+        }));
 
     }
 
@@ -826,6 +1154,7 @@ export default {
     handlePaystackWebhook,
     verifyPaystackPayment,
     prepareWorkerPayout,
-    getPaymentHistory
-
+    processWorkerPayout,
+    verifyWorkerPayout,
+    getPaymentHistory,
 };
