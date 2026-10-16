@@ -822,10 +822,9 @@ const completeShift = async (userId, shiftId) => {
     }
 };
 
-// delete a shift by facility
+// Delete a shift by facility
 const deleteShift = async (userId, shiftId) => {
-
-    // find the facility belonging to the logged-in user
+    // Find the facility belonging to the logged-in user
     const facility = await Facility.findOne({
         user: userId
     });
@@ -834,7 +833,7 @@ const deleteShift = async (userId, shiftId) => {
         throw new Error("Facility profile not found");
     }
 
-    // find the shift belonging to the facility
+    // Find the shift belonging to the facility
     const shift = await Shift.findOne({
         _id: shiftId,
         facility: facility._id
@@ -846,33 +845,21 @@ const deleteShift = async (userId, shiftId) => {
         );
     }
 
-    // don't allow deletion of a shift with assigned workers
+    // Don't allow deletion of a shift with assigned workers
     if (shift.assignedWorkers.length > 0) {
         throw new Error(
             "A shift with assigned workers cannot be deleted"
         );
     }
 
-    // find the payment record associated with this shift
-    const payment = await Payment.findOne({
-        shift: shift._id,
-        facility: facility._id
-    });
-
-    // don't allow deletion when a payment record exists
-    if (payment) {
-        throw new Error(
-            "This shift has a payment record and cannot be deleted. Use a payment cancellation or refund process instead."
-        );
-    }
-
-    // only allow deletion of unpublished or closed shifts
+    // Only allow deletion of shifts awaiting payment or closed
     if (!["pending_payment", "closed"].includes(shift.status)) {
         throw new Error(
             "Only shifts awaiting payment or closed shifts can be deleted"
         );
     }
 
+    // Delete the shift even if a payment record exists
     await shift.deleteOne();
 
     return shift;

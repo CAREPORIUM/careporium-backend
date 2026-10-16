@@ -4,3 +4,4 @@ node_modules/
 controllers/.DS_Store
 uploads/
 createAdmin.js
+changeAdminPassword.js
